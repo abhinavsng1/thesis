@@ -53,8 +53,8 @@ The project is a local git repository (`~/thesis`) with the history of the build
 | Home, composer, examples, recent research, sample reports | Complete, verified in browser |
 | Research workspace states (queued / researching / synthesizing / completed / failed / cancelled / not found) | Complete, verified against a local provider mock |
 | Report document, citations, source drawer, section nav, brief/full, copy, download, print styles | Complete, verified (print pagination not verified in a real dialog) |
-| Parallel integration | Implemented per official docs; unit-tested against documented shapes; **not exercised against the real API** |
-| Claude synthesis | Implemented with the official SDK and structured outputs; **not exercised against the real API** |
+| Parallel integration | Verified against the real API with the user's key: two `core` runs completed in about four minutes each |
+| Claude synthesis | Verified against the real API: schema-guided JSON validated server-side (strict structured outputs rejected the schema as too large); ~40 s per report |
 | Tests, type check, lint, production build | All pass |
 | Deployment | Live at the public URL above, demo mode |
 
