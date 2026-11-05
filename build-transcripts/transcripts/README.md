@@ -1,26 +1,30 @@
 # Agent transcripts
 
-This folder holds exported conversation transcripts of the build agent (Claude Code) sessions used to build Thesis.
+This folder holds the exported conversation transcript of the Claude Code session that built Thesis.
+
+## Files
+
+- `session-10ced0b5-2026-11-05.jsonl` — verbatim export of the build session from Claude Code's session store (JSONL, one event per line: user messages, assistant messages, tool calls and tool results as recorded by the harness). The only edits are the redactions listed below. It is a snapshot copied near the end of the session, so the final few actions (this copy, the last commit) are not inside it.
 
 ## Provenance
 
-- Transcripts here are **verbatim exports** produced by Claude Code's own session storage, copied without edits other than the redactions noted below. They are not summaries written after the fact.
-- If a file is missing from this folder, the export was not available at the time of handoff; `session-log.md` is the accurate (non-verbatim) activity record.
-
-## How transcripts are exported
-
-Claude Code stores each session as a JSONL file under `~/.claude/projects/<encoded-working-directory>/<session-id>.jsonl`. The export in this folder was created by copying the session file(s) for this project and redacting secrets:
+- Source: `~/.claude/projects/-Users-abhinavsingh/10ced0b5-8208-471c-804f-7869900f1dab.jsonl` on the build machine.
+- Export command (run from the project root):
 
 ```bash
-# list sessions for the home-directory project (this build ran from ~)
-ls -t ~/.claude/projects/-Users-abhinavsingh/*.jsonl | head
-# copy the session into the transcripts folder
-cp ~/.claude/projects/-Users-abhinavsingh/<session-id>.jsonl build-transcripts/transcripts/
+SRC=~/.claude/projects/-Users-abhinavsingh/10ced0b5-8208-471c-804f-7869900f1dab.jsonl
+sed -E 's/sk-ant-[A-Za-z0-9_-]+/sk-ant-[REDACTED]/g; s/(PARALLEL_API_KEY|ANTHROPIC_API_KEY)=[^"\\ ]+/\1=[REDACTED]/g; s/[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}/[email redacted]/g' "$SRC" > build-transcripts/transcripts/session-10ced0b5-2026-11-05.jsonl
 ```
 
-Redaction: a scripted pass removes any string matching common API-key patterns (`sk-ant-...`, `PARALLEL_API_KEY=...`, Vercel tokens). The redaction script and its output are described in `../validation.md`.
+- Redactions: API-key-shaped strings, `PARALLEL_API_KEY=` / `ANTHROPIC_API_KEY=` assignments, and e-mail addresses. No real provider keys were ever present in the session (the live flow was tested against a local mock with placeholder keys), so the key patterns are precautionary.
+- Hidden chain-of-thought is not part of the harness's session file and is therefore not in the export.
 
-## What is and is not in a transcript
+## Reading the file
 
-- Included: user messages, assistant messages, tool calls and tool results as recorded by the harness.
-- Not included: hidden chain-of-thought (the harness does not persist raw reasoning), API keys or environment values.
+Each line is a JSON object. The `type` field distinguishes `user` and `assistant` events; tool calls appear as `tool_use` content blocks in assistant events and their results as `tool_result` blocks in the following user event. To list the assistant's visible messages:
+
+```bash
+jq -r 'select(.type=="assistant") | .message.content[]? | select(.type=="text") | .text' session-10ced0b5-2026-11-05.jsonl
+```
+
+If the file is missing or you need a fresh export, run the command above again on the build machine; `../session-log.md` is the accurate (non-verbatim) activity record either way.

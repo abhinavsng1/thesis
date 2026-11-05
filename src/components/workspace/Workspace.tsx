@@ -77,7 +77,7 @@ export function Workspace({ id, mode }: { id: string; mode: AppMode }) {
         </div>
 
         {report ? (
-          <div className="lg:grid lg:grid-cols-[190px_minmax(0,1fr)] lg:gap-12">
+          <div className="doc-grid lg:grid lg:grid-cols-[190px_minmax(0,1fr)] lg:gap-12">
             <SectionNav sections={sections} />
             <div className="min-w-0 lg:max-w-[760px]">
               <ReportDocument report={report} view={docView} />

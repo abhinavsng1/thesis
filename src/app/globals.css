@@ -274,6 +274,12 @@ body {
     color: inherit;
     text-decoration: none;
   }
+  .doc-grid {
+    display: block !important;
+  }
+  .doc-grid > div {
+    max-width: none !important;
+  }
   .doc-main {
     max-width: none !important;
     margin: 0 !important;
