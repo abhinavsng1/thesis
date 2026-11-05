@@ -1,34 +1,37 @@
 import Link from "next/link";
 import { ArrowRight } from "lucide-react";
-import type { Report } from "@/lib/schema/report";
+import type { SampleSummary } from "@/lib/research/samples";
 
-type Sample = Pick<Report, "id" | "title" | "question" | "asOf" | "stats">;
-
-export function SampleReports({ samples }: { samples: Sample[] }) {
+export function SampleReports({ samples }: { samples: SampleSummary[] }) {
   return (
     <section aria-labelledby="samples-h">
       <div className="flex items-baseline justify-between">
         <h2 id="samples-h" className="meta">
           Sample reports
         </h2>
-        <span className="text-[12.5px] text-muted">No credentials needed</span>
+        <span className="text-[12.5px] text-muted">Open without credentials</span>
       </div>
-      <ul className="mt-3 divide-y divide-rule border-y border-rule">
+      <ul className="mt-3 space-y-3">
         {samples.map((s) => (
           <li key={s.id}>
-            <Link href={`/research/${s.id}`} className="group block py-4 hover:bg-teal-tint/60 -mx-2 px-2 rounded-[8px]">
-              <p className="font-serif text-[19px] leading-snug text-ink">{s.title}</p>
-              <p className="mt-1.5 text-[13.5px] text-muted">
-                Sample · as of {s.asOf} · {s.stats.readingMinutes} min read
-                <ArrowRight className="ml-1.5 inline h-3.5 w-3.5 text-teal opacity-0 transition-opacity group-hover:opacity-100" aria-hidden="true" />
+            <Link href={`/research/${s.id}`} className="group panel block p-4 transition-colors hover:border-teal/50 sm:p-5">
+              <p className="meta">Sample · as of {s.asOf}</p>
+              <p className="mt-1.5 font-serif text-[19px] leading-snug text-ink group-hover:text-teal-deep">{s.title}</p>
+              <p className="mt-2 line-clamp-2 text-[13.5px] leading-[1.55] text-ink-2">{s.stance}</p>
+              <p className="mt-3 flex flex-wrap items-center gap-x-3 text-[12.5px] text-muted">
+                <span>{s.sources} sources</span>
+                <span>{s.charts} charts</span>
+                <span>{s.stats.readingMinutes} min read</span>
+                <span className="ml-auto inline-flex items-center gap-1 font-semibold text-teal-deep">
+                  Open
+                  <ArrowRight className="h-3.5 w-3.5 transition-transform group-hover:translate-x-0.5" aria-hidden="true" />
+                </span>
               </p>
             </Link>
           </li>
         ))}
       </ul>
-      <p className="mt-2 text-[12.5px] leading-relaxed text-muted">
-        Compiled from company filings and releases on the dates shown; clearly labelled as samples inside the report.
-      </p>
+      <p className="mt-2 text-[12px] leading-relaxed text-muted">Compiled from company filings and releases on the dates shown, and labelled as samples inside the report.</p>
     </section>
   );
 }

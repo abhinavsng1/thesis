@@ -67,9 +67,9 @@ export function ResearchProgress({ view, onCancel }: { view: JobView; onCancel: 
 
       <div className="mt-6 grid gap-8 lg:grid-cols-[minmax(0,1fr)_260px] lg:gap-10">
         <div className="min-w-0">
-          <p className="flex items-center gap-2 font-serif text-[21px] leading-snug text-ink sm:text-[23px]">
-            {active && <span className="inline-block h-2 w-2 shrink-0 rounded-full bg-teal pulse" aria-hidden="true" />}
-            <span>{line}</span>
+          <p className="font-serif text-[21px] leading-snug text-ink sm:text-[23px]">
+            {line}
+            {active && <span className="ml-2 inline-block h-2 w-2 rounded-full bg-teal align-middle pulse" aria-hidden="true" />}
           </p>
 
           {view.status === "synthesizing" ? <SynthesisChecklist synth={view.synth} /> : <StepGroups groups={groups} live={active} />}

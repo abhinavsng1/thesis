@@ -102,10 +102,10 @@ export function Composer({ config, draft, onDraftChange }: { config: PublicConfi
               void submit();
             }
           }}
-          rows={3}
+          rows={2}
           maxLength={600}
-          placeholder="e.g. What is the investment thesis for Microsoft over the next three years?"
-          className="mt-2 w-full resize-y rounded-[9px] border border-rule bg-paper px-3.5 py-3 font-serif text-[21px] leading-[1.35] text-ink placeholder:text-muted/70 focus:border-teal focus:outline-none sm:text-[23px]"
+          placeholder="What is the investment thesis for Microsoft over the next three years?"
+          className="mt-2 w-full resize-y rounded-[9px] border border-rule bg-paper px-3.5 py-3 font-serif text-[20px] leading-[1.35] text-ink placeholder:text-muted/60 focus:border-teal focus:outline-none sm:text-[22px]"
           aria-invalid={error ? true : undefined}
         />
         <div className="mt-3 flex flex-wrap items-center gap-x-5 gap-y-3">
@@ -175,22 +175,18 @@ export function Composer({ config, draft, onDraftChange }: { config: PublicConfi
           </p>
         )}
       </form>
-      <div className="mt-5 border-t border-rule pt-4">
-        <p className="meta">Try one of these</p>
-        <ul className="mt-2 divide-y divide-rule">
-          {EXAMPLES.map((q) => (
-            <li key={q}>
-              <button
-                type="button"
-                onClick={() => applyExample(q)}
-                className="group flex w-full items-start justify-between gap-3 py-2.5 text-left text-[15.5px] text-ink-2 hover:text-ink"
-              >
-                <span className="font-serif text-[17px] leading-snug">{q}</span>
-                <ArrowUpRight className="mt-0.5 h-4 w-4 shrink-0 text-muted group-hover:text-teal" aria-hidden="true" />
-              </button>
-            </li>
-          ))}
-        </ul>
+      <div className="mt-4 flex flex-wrap items-center gap-2 border-t border-rule pt-3.5">
+        <span className="meta mr-1">Try</span>
+        {EXAMPLES.map((q) => (
+          <button
+            key={q}
+            type="button"
+            onClick={() => applyExample(q)}
+            className="rounded-full border border-rule-strong bg-paper px-3 py-1.5 text-left text-[13.5px] leading-snug text-ink-2 transition-colors hover:border-teal hover:bg-teal-tint hover:text-ink"
+          >
+            {q}
+          </button>
+        ))}
       </div>
     </div>
   );

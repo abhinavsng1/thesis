@@ -3,9 +3,8 @@ import type { PublicConfig } from "@/lib/research/config";
 export function ModeNotice({ config }: { config: PublicConfig }) {
   if (config.mode === "live") {
     return (
-      <p className="mt-4 text-[13.5px] text-muted">
-        Live research is on. Quick runs use the <span className="font-semibold text-ink-2">{config.processors.quick}</span> processor and deep runs use{" "}
-        <span className="font-semibold text-ink-2">{config.processors.deep}</span>; synthesis uses {config.synthesisModel}. Each run is a paid provider request.
+      <p className="mt-3 text-[12.5px] leading-relaxed text-muted">
+        Live research is on. Quick runs usually take three to five minutes, deep runs longer; you can watch every step and leave the page while it works.
       </p>
     );
   }
