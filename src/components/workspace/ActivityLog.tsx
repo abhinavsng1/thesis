@@ -1,6 +1,7 @@
 import type { ActivityEvent } from "@/lib/schema/request";
 import type { TraceEntry, TraceStats } from "@/lib/client/history";
-import { Timeline, groupSteps } from "./ResearchProgress";
+import { StepGroups } from "./ResearchProgress";
+import { groupTrace } from "@/lib/client/trace";
 
 export function ActivityLog({ events, trace = [], stats = null, defaultOpen = false }: { events: ActivityEvent[]; trace?: TraceEntry[]; stats?: TraceStats | null; defaultOpen?: boolean }) {
   return (
@@ -18,7 +19,7 @@ export function ActivityLog({ events, trace = [], stats = null, defaultOpen = fa
               </p>
             )}
           </div>
-          <Timeline blocks={groupSteps(trace)} live={false} />
+          <StepGroups groups={groupTrace(trace)} live={false} />
         </div>
       )}
       <ol className="divide-y divide-rule border-t border-rule">

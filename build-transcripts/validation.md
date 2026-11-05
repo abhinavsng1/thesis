@@ -76,6 +76,12 @@ The user supplied provider keys after the initial handoff. Keys were placed in `
 - Browser: the researching panel showed the live feed with timestamps, source chips and provider progress; after completion the same 42-step trace was retained under "Research activity" and restored from local history on reload.
 - `tests/events.test.ts`: event normalization (documented Parallel event types, unsafe URL filtering, clamped progress) and chunked SSE parsing.
 
+## Research workspace and streamed synthesis (second iteration)
+
+- Real Quick run (Tesla, `base`): phase rail advanced Plan → Search → Read on real events; headline showed the current query; timeline grouped objectives with their queries and the documents read (SEC filings linked); sources panel showed 172→405 read of 237→523 considered with the provider's progress meter. Provider time 5.5 min.
+- Synthesis stream: checklist ticked Executive brief → Thesis → Evidence table → Charts → Scenarios → Risks → Catalysts live, headline "Writing the risks and counterarguments", token estimate shown and labelled as an estimate; report rendered at the end (847 words, 8 sources).
+- Found and fixed: the event stream reconnected in a loop for a few seconds after the provider finished (now stops after a terminal status event); page auto-scroll now only follows when the reader is at the bottom.
+
 ## Environment issues encountered
 
 - The machine's disk hit "No space left on device" during development (192 MB free). The npm cache and Go build cache were cleared (regenerable). A request to remove a GitHub Desktop updater cache was declined by the permission system, so about 1 GB remained free for the build, which succeeded.
