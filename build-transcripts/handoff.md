@@ -4,19 +4,21 @@
 
 **https://thesis-three-delta.vercel.app** — public production deployment on Vercel, no login required (verified with an unauthenticated request returning 200 on 2026-11-05).
 
-The deployment runs in **demo mode** because no provider credentials were available at build time. Reviewers can:
-- Explore two complete, clearly labelled sample reports (Microsoft three-year thesis; NVIDIA vs AMD comparison) including the brief/full toggle, citations and source drawer, charts with data tables, Markdown copy/download, and print.
-- See the demo notice on the home page, which names the missing variables. Submitting a question in demo mode returns an honest "live research is not configured" message rather than canned content.
+The deployment runs in **live mode**: Parallel and Anthropic keys are configured in the Vercel project, so reviewers can ask real questions. Reviewers can:
+- Ask any investing question. A quick run takes about four minutes of provider research plus about 40 seconds of synthesis; the workspace shows every step live and the page can be left and reopened in the same browser.
+- Explore two complete, clearly labelled sample reports (Microsoft three-year thesis; NVIDIA vs AMD comparison) without waiting, including the brief/full toggle, citations and source drawer, charts with data tables, Markdown copy/download, and print.
+
+Each live question costs the project owner roughly $0.03 (Parallel `core`) plus one Claude call. If the keys are removed, the app falls back to a clearly labelled demo mode with the sample reports only.
 
 The team-scoped alias (`thesis-abhinav-singhs-projects-caf059ea.vercel.app`) is behind Vercel's deployment protection and redirects to a login; use the public alias above.
 
-## Enabling live research
+## Rotating or replacing keys
 
 Set both variables in the Vercel project (`abhinav-singhs-projects-caf059ea/thesis`) and redeploy:
 
 ```bash
-echo "<key>" | vercel env add PARALLEL_API_KEY production
-echo "<key>" | vercel env add ANTHROPIC_API_KEY production
+vercel env add PARALLEL_API_KEY production --value "<key>" --yes
+vercel env add ANTHROPIC_API_KEY production --value "<key>" --yes
 vercel deploy --prod
 ```
 
@@ -60,7 +62,7 @@ While a run is in progress the workspace shows a phase rail (Plan → Search →
 | Parallel integration | Verified against the real API with the user's key: two `core` runs completed in about four minutes each |
 | Claude synthesis | Verified against the real API: schema-guided JSON validated server-side (strict structured outputs rejected the schema as too large); ~40 s per report |
 | Tests, type check, lint, production build | All pass |
-| Deployment | Live at the public URL above, demo mode |
+| Deployment | Live at the public URL above, live mode, verified end to end on the deployment |
 
 ## Limitations
 
@@ -68,7 +70,7 @@ While a run is in progress the workspace shows a phase rail (Plan → Search →
 - No market-data source: no prices or valuation multiples anywhere.
 - Parallel exposes no cancel endpoint for task runs; "Stop waiting" only stops polling.
 - In-memory idempotency map, report cache and rate limiter are per server instance.
-- The sample reports were hand-compiled by the build agent from figures verified on 2026-11-05 against company filings and releases; they are not the output of a live research run and say so.
+- The sample reports were hand-compiled by the build agent from figures verified on 2026-11-05 against company filings and releases (no credentials were available at that point); they are not the output of a live research run and say so.
 - The disk on the build machine was nearly full during the session; this did not affect the delivered code but is noted in `validation.md`.
 
 ## Demo video
@@ -77,4 +79,4 @@ While a run is in progress the workspace shows a phase rail (Plan → Search →
 
 ## Transcripts
 
-See `transcripts/README.md`. The session transcript exported from Claude Code's session store is copied into `transcripts/` with API-key patterns and e-mail addresses redacted; the copy is a snapshot taken at the end of the build session and does not include any later activity.
+See `transcripts/README.md`. The session transcript exported from Claude Code's session store is copied into `transcripts/` with API keys and e-mail addresses redacted; the copy is a snapshot taken near the end of the build session (2026-11-05, ~13:48) and does not include the final few actions.

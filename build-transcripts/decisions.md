@@ -9,7 +9,7 @@ The working directory had no repository matching the brief (`~/ai-research-os` i
 ## 2. Two-stage pipeline: Parallel for retrieval, Claude for synthesis
 
 - Parallel's Task API is asked for a **structured evidence pack** (facts, metric rows, risks, catalysts, conflicts, missing items) via a JSON `output_schema`, not for prose. Its `basis` array gives per-field citations, which the app maps to each evidence item.
-- One bounded Claude call turns that evidence document into the report schema (structured outputs validated with Zod by the SDK and again on the server).
+- One bounded Claude call turns that evidence document into the report. (Updated after live testing: Anthropic's strict structured-output mode rejected the report schema as too large to compile into a grammar, so the model now returns a JSON object guided by the schema embedded in the cached system prompt; the server parses it, validates it with Zod, coerces it into the strict schema, and retries once with the validation errors.)
 
 Why not let Parallel write the whole report? Its documented JSON-schema limits (nesting depth, field counts) make the full report shape risky, and prose output would lose the per-claim citation structure. Why not a multi-turn agent? Cost and token discipline: a single call over a deduplicated, size-capped evidence document is predictable, cacheable (fixed system prompt with `cache_control`), and auditable. The tradeoff is that the synthesis model cannot request more evidence; gaps are reported as limitations instead of filled.
 
@@ -34,7 +34,9 @@ Parallel's documentation for task runs lists `cancelling`/`cancelled` statuses b
 
 ## 6. Observable states only
 
-`queued → researching → synthesizing → completed | failed | cancelled`. "Synthesizing" is a real server stage. There is no progress percentage because the provider does not report one; the status panel says so. The activity log records provider status changes, synthesis start/finish, measured token counts, and errors, with timestamps.
+`queued → researching → synthesizing → completed | failed | cancelled`. "Synthesizing" is a real server stage. The activity log records provider status changes, synthesis start/finish, measured token counts, and errors, with timestamps.
+
+Updated during the build: Parallel's event stream (`GET /v1/tasks/runs/{run_id}/events`) is proxied to the browser, so the workspace shows the agent's plan, searches, documents read, source counts and the provider's own progress meter live, grouped into collapsible steps with only the current one expanded. Synthesis is streamed too: the report request reports evidence received, each section as the model reaches it, and validation. The percentage shown is the provider's, never an estimate.
 
 ## 7. Report schema as the single contract
 
@@ -56,12 +58,16 @@ No provider credentials were available, so the two samples were compiled by the 
 
 ## 11. Synthesis model default
 
-`claude-opus-5-5` at `medium` effort, configurable via environment variables. Opus is the SDK guidance default; medium effort keeps a 1,000-word structured report fast and inexpensive. Streaming is unnecessary because the output is bounded (max 16k tokens) and the SDK timeout is set to four minutes.
+`claude-opus-5-5` at `medium` effort, configurable via environment variables. Opus is the SDK guidance default; medium effort keeps a 1,000-word structured report fast (about 40 s) and inexpensive. The call is streamed so section-by-section progress can be shown; the final message carries the measured token counts.
 
 ## 12. Deployment
 
-Vercel, from the CLI. `build-transcripts/` and `tests/` are excluded from the upload via `.vercelignore` so the records are not published as part of the deployment. The deployment runs in demo mode until `PARALLEL_API_KEY` and `ANTHROPIC_API_KEY` are set in the project.
+Vercel, from the CLI. `build-transcripts/` and `tests/` are excluded from the upload via `.vercelignore` so the records are not published as part of the deployment. The deployment ran in demo mode until the user supplied `PARALLEL_API_KEY` and `ANTHROPIC_API_KEY`; it now runs live.
 
 ## 13. Things deliberately not built
 
 Authentication, portfolios, trading, live market data, server-side report storage, webhooks (polling is sufficient at this scale and avoids an inbound endpoint to secure), Vercel Workflow (the provider already owns the long-running job; a second durable layer would be unnecessary infrastructure for this prototype).
+
+## 14. Processor choice is not a speed lever
+
+Quick was briefly moved to Parallel's `base` processor to shorten waits; a real run took 5.5 minutes against about 4 for `core` and 3.5 for `pro`, so Quick stayed on `core`. Research time is the provider's; the product's answer to the wait is the live step view, not a faster tier.
