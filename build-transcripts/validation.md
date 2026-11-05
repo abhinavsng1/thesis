@@ -82,6 +82,13 @@ The user supplied provider keys after the initial handoff. Keys were placed in `
 - Synthesis stream: checklist ticked Executive brief → Thesis → Evidence table → Charts → Scenarios → Risks → Catalysts live, headline "Writing the risks and counterarguments", token estimate shown and labelled as an estimate; report rendered at the end (847 words, 8 sources).
 - Found and fixed: the event stream reconnected in a loop for a few seconds after the provider finished (now stops after a terminal status event); page auto-scroll now only follows when the reader is at the bottom.
 
+## Workspace iteration 3 (collapsible steps) and home redesign
+
+- Unit tests (`tests/trace.test.ts`): humanised steps (SEC file names → "TSLA filing, period ending Sep 2026"), grouping with summaries ("Ran 2 searches: …", "Read 2 documents from sec.gov, ir.tesla.com"), duplicate-document collapse, monotonic phase, short status lines.
+- Browser, real run at 1440×900: current step (spinner) at y=474 with scrollY 0, phases Plan ✓ Search ✓ Read ●, status line "Searching: …", 6 real hrefs in the steps and sources panel.
+- Home: start button bottom at 640px in a 771px viewport; mobile 390px: home and report 375px scroll width, no overflow.
+- Deployed; "How a report is made" present on the production alias.
+
 ## Environment issues encountered
 
 - The machine's disk hit "No space left on device" during development (192 MB free). The npm cache and Go build cache were cleared (regenerable). A request to remove a GitHub Desktop updater cache was declined by the permission system, so about 1 GB remained free for the build, which succeeded.

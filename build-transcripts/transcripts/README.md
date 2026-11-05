@@ -13,10 +13,10 @@ This folder holds the exported conversation transcript of the Claude Code sessio
 
 ```bash
 SRC=~/.claude/projects/-Users-abhinavsingh/10ced0b5-8208-471c-804f-7869900f1dab.jsonl
-sed -E 's/sk-ant-[A-Za-z0-9_-]+/sk-ant-[REDACTED]/g; s/(PARALLEL_API_KEY|ANTHROPIC_API_KEY)=[^"\\ ]+/\1=[REDACTED]/g; s/[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}/[email redacted]/g' "$SRC" > build-transcripts/transcripts/session-10ced0b5-2026-11-05.jsonl
+sed -E 's/sk-ant-[A-Za-z0-9_-]+/sk-ant-[REDACTED]/g; s/(PARALLEL_API_KEY|ANTHROPIC_API_KEY)=[^"\\ ]+/\1=[REDACTED]/g; s/<parallel key literal>/[PARALLEL_KEY_REDACTED]/g; s/[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}/[email redacted]/g' "$SRC" > build-transcripts/transcripts/session-10ced0b5-2026-11-05.jsonl
 ```
 
-- Redactions: API-key-shaped strings, `PARALLEL_API_KEY=` / `ANTHROPIC_API_KEY=` assignments, and e-mail addresses. No real provider keys were ever present in the session (the live flow was tested against a local mock with placeholder keys), so the key patterns are precautionary.
+- Redactions: API-key-shaped strings, `PARALLEL_API_KEY=` / `ANTHROPIC_API_KEY=` assignments, the two provider keys the user pasted into chat later in the session (replaced with `[REDACTED]` placeholders), and e-mail addresses. The user was advised to rotate both keys.
 - Hidden chain-of-thought is not part of the harness's session file and is therefore not in the export.
 
 ## Reading the file

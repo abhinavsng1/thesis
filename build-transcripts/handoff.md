@@ -46,6 +46,10 @@ npm test && npm run typecheck && npm run lint && npm run build
 
 The project is a local git repository (`~/thesis`) with the history of the build. It has not been pushed to GitHub or shared anywhere; the only upload was the Vercel deployment, which excludes this folder.
 
+## Live research experience
+
+While a run is in progress the workspace shows a phase rail (Plan → Search → Read → Write → Ready), a one-line status of the current activity, collapsible step groups (plan, searches with their queries, documents read with links, notes) where only the current group is expanded, and a sources panel with provider-reported counts and progress. Synthesis streams section-by-section. The full step trace stays with the report under "Research activity".
+
 ## Status
 
 | Area | Status |
