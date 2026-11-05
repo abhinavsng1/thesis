@@ -5,7 +5,7 @@ Produces two files from the harness's session store:
   session-<id>.jsonl   the conversation events (user, assistant, tool calls, tool results),
                        with internal request blobs and empty reasoning placeholders removed
   session-<id>.md      the same conversation rendered for reading
-Redactions applied to both: API keys, e-mail addresses, image bytes, and a short list of expletives.
+Redactions applied to both: API keys, e-mail addresses, image bytes, and a short list of words supplied in redact.local.
 Nothing else is rewritten; message order and content are otherwise as recorded.
 """
 import json, re, sys, datetime, pathlib
@@ -16,9 +16,13 @@ KEY_PATTERNS = [
     (re.compile(r"(PARALLEL_API_KEY|ANTHROPIC_API_KEY)=[^\s\"'\\]+"), r"\1=[REDACTED]"),
     (re.compile(r"\b[A-Za-z0-9]{40}\b(?=.*parallel|.*PARALLEL|.*api key)", re.I), "[PARALLEL_KEY_REDACTED]"),
     (re.compile(r"[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}"), "[email redacted]"),
-    (re.compile(r"\b(shitty|shit|fuck(?:ing)?|crap)\b", re.I), "[expletive]"),
 ]
-LITERALS = [l for l in (pathlib.Path(__file__).with_name("redact.local").read_text().split() if pathlib.Path(__file__).with_name("redact.local").exists() else [])]
+# redact.local (not distributed): one literal per line. Lines starting with "word:" are replaced with
+# "[expletive]"; every other line is a secret fragment replaced with "[REDACTED]".
+_local = pathlib.Path(__file__).with_name("redact.local")
+_lines = _local.read_text().split() if _local.exists() else []
+LITERALS = [l for l in _lines if not l.startswith("word:")]
+WORDS = [re.compile(r"\b" + re.escape(l[5:]) + r"\b", re.I) for l in _lines if l.startswith("word:")]
 
 def redact(s: str) -> str:
     # Patterns first (they match whole keys); literals last (fragments, prefixes, words).
@@ -26,6 +30,8 @@ def redact(s: str) -> str:
         s = pat.sub(rep, s)
     for lit in LITERALS:
         s = s.replace(lit, "[REDACTED]")
+    for w in WORDS:
+        s = w.sub("[expletive]", s)
     return s
 
 def clean_block(b):

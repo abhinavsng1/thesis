@@ -1,29 +1,25 @@
-# dependencies
-/node_modules
 
-# next.js
-/.next/
-/out/
-
-# production
-/build
-
-# misc
+!.env.example
 .DS_Store
-*.pem
-*.tsbuildinfo
-next-env.d.ts
-
-# debug
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-.pnpm-debug.log*
-
-# env files: never commit real credentials
 .env
 .env.*
-!.env.example
-
-# vercel
+.pnpm-debug.log*
 .vercel
+*.pem
+*.tsbuildinfo
+/.next/
+/build
+/node_modules
+/out/
+# debug
+# dependencies
+# env files: never commit real credentials
+# misc
+# next.js
+# production
+# vercel
+next-env.d.ts
+npm-debug.log*
+redact.local
+yarn-debug.log*
+yarn-error.log*
