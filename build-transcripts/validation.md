@@ -70,6 +70,12 @@ The user supplied provider keys after the initial handoff. Keys were placed in `
 - Deployed site: `POST /api/research` returned "Research provider rejected the API key" (502) while the same code with the same key worked locally, so the value stored in Vercel is not the raw key. Vercel stores it as a hidden secret, so it cannot be inspected; the user was asked to re-add both values at the interactive `vercel env add` prompt and redeploy.
 - Full browser journey with real providers (Tesla question): see session log for the outcome.
 
+## Live research activity feed (added at the user's request)
+
+- `GET /api/research/{id}/events` on the local server proxied Parallel's stream: `status`, `exec_status`, `tool_call`, `extract` (SEC 10-K/10-Q URLs), `search` (Objective/Query), `stats` (sources read/considered, progress) events observed within the first 25 s of a real run.
+- Browser: the researching panel showed the live feed with timestamps, source chips and provider progress; after completion the same 42-step trace was retained under "Research activity" and restored from local history on reload.
+- `tests/events.test.ts`: event normalization (documented Parallel event types, unsafe URL filtering, clamped progress) and chunked SSE parsing.
+
 ## Environment issues encountered
 
 - The machine's disk hit "No space left on device" during development (192 MB free). The npm cache and Go build cache were cleared (regenerable). A request to remove a GitHub Desktop updater cache was declined by the permission system, so about 1 GB remained free for the build, which succeeded.

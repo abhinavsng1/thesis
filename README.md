@@ -73,7 +73,11 @@ Layers are kept separate on purpose:
 
 There is no database. The Parallel `run_id` is the job id. Status is proxied from the provider on each poll, the synthesized report is cached in process memory for an hour (best effort on serverless), and the browser keeps the durable copy of its own reports in `localStorage`. If a server instance no longer remembers a run, the browser re-supplies the original question with the report request so synthesis can still complete.
 
-Observable states: `queued` → `researching` → `synthesizing` → `completed`, plus `failed` and `cancelled`. "Synthesizing" is a real stage (the provider has completed and the synthesis call is in flight). No progress percentages are shown because the provider does not report them.
+Observable states: `queued` → `researching` → `synthesizing` → `completed`, plus `failed` and `cancelled`. "Synthesizing" is a real stage (the provider has completed and the synthesis call is in flight).
+
+### Live research activity
+
+While a run is in progress the workspace streams what the research agent is doing: its plan, each search objective and query, every source it extracts (linked), tool calls, and the provider's own progress meter and source counts. The server proxies Parallel's `GET /v1/tasks/runs/{run_id}/events` SSE stream through `/api/research/[id]/events`, normalizes the events, and never forwards credentials. The browser consumes it with `EventSource`, deduplicates replayed messages, and persists the trace to local history so the full agent trace is still readable under "Research activity" after the report is ready. Runs are created with `enable_events: true`. The progress percentage shown is the provider's `progress_meter`, not an estimate.
 
 ### Duplicate and failure handling
 
