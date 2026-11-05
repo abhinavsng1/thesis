@@ -59,6 +59,17 @@ Verified:
 - Deployed with `vercel deploy --prod --yes` (team `abhinav-singhs-projects-caf059ea`, project `thesis`). Both production deployments reached `● Ready`.
 - Public alias `https://thesis-three-delta.vercel.app` → 200 without authentication; `/api/config` → demo mode; sample report → 200; `POST /api/research` → 503 `live_research_disabled`. The team-scoped alias redirects (302) to the Vercel login because it is a protected URL; reviewers should use the public alias.
 
+## Live verification against the real providers (added after keys were supplied)
+
+The user supplied provider keys after the initial handoff. Keys were placed in `.env.local` by the user; the agent never printed or copied the values.
+
+- Direct probes: `POST https://api.parallel.ai/v1/tasks/runs` (processor `lite`) → 202; `GET https://api.anthropic.com/v1/models` → 200. Both keys valid.
+- Local app: `POST /api/research` → 202 with a real `trun_…` id; status polling showed `researching` for about four minutes, then `completed`.
+- First synthesis attempt failed with HTTP 400 from Anthropic: "The compiled grammar is too large" (strict structured-output mode cannot compile the report schema, even with all length/pattern constraints removed). Fix: the model now returns a JSON object guided by the schema embedded in the cached system prompt; the server parses, Zod-validates, coerces into the strict schema, and retries once with the validation errors. Added `tests/synthesis.test.ts` (JSON extraction, coercion).
+- After the fix: `POST …/report` → 200 in 41 s. Report: 956 words, 7 sources (FY2026 10-K, SEC 8-K exhibits, IR releases, FY27 Q1 call page), 5 thesis points, 2 charts, 6 risks, 3 catalysts, limitations listing missing forecasts/valuation/capex guidance. Usage reported by the model: 4,402 input / 4,880 output tokens. A redundant "Answer:" prefix in the brief was stripped server-side.
+- Deployed site: `POST /api/research` returned "Research provider rejected the API key" (502) while the same code with the same key worked locally, so the value stored in Vercel is not the raw key. Vercel stores it as a hidden secret, so it cannot be inspected; the user was asked to re-add both values at the interactive `vercel env add` prompt and redeploy.
+- Full browser journey with real providers (Tesla question): see session log for the outcome.
+
 ## Environment issues encountered
 
 - The machine's disk hit "No space left on device" during development (192 MB free). The npm cache and Go build cache were cleared (regenerable). A request to remove a GitHub Desktop updater cache was declined by the permission system, so about 1 GB remained free for the build, which succeeded.

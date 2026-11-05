@@ -83,6 +83,10 @@ Observable states: `queued` → `researching` → `synthesizing` → `completed`
 - Synthesis errors (auth, rate limit, timeout, refusal, schema mismatch, truncation) are surfaced with a retry control when retryable.
 - Cancellation: Parallel's docs expose no cancel endpoint for task runs, so "Stop waiting" stops polling only and says so. The run may complete and be billed; "Resume checking" picks it up again.
 
+## Verified against the real providers
+
+With real credentials in `.env.local`, a `core` run for "What is the investment thesis for Microsoft over the next three years?" completed in about four minutes, and synthesis with `claude-opus-5-5` took about 40 seconds, producing a 956-word report citing seven primary sources (FY2026 10-K, SEC exhibits, Microsoft IR releases and the FY27 Q1 call) with two charts and explicit limitations. Measured usage for that call: 4,402 input and 4,880 output tokens.
+
 ## Research-provider integration (Parallel)
 
 Implemented against the official documentation read on 2026-11-05:
@@ -105,7 +109,7 @@ The goal is useful information per token, for the reader and for the model calls
 2. **Deduplication before synthesis.** Sources are deduplicated by canonical URL and numbered once; facts, metrics, risks and catalysts are deduplicated while preserving their citations.
 3. **Bounded context.** The synthesis model sees only the normalized evidence document, capped at `THESIS_MAX_EVIDENCE_CHARS` (default 36k characters). The raw corpus never reaches the model, and nothing is resent across calls: there is exactly one synthesis call per report.
 4. **Stable prefix, cached.** The system prompt is fixed and marked with `cache_control`, so repeated runs reuse the cached prefix.
-5. **Structured output with a word budget.** The model returns the report schema directly (Zod-validated by the SDK and again on the server) with a configurable target length (400–2,000 words, default 1,000). Numbers go to the metrics table and charts rather than paragraphs.
+5. **Schema-guided JSON with a word budget.** The model returns one JSON object following the report's JSON Schema (sent once in the cached system prompt) with a configurable target length (400–2,000 words, default 1,000); the server validates it with Zod and retries once with the errors if needed. Anthropic's strict structured-output mode was tried first and rejected the schema as too large to compile into a grammar, so validation happens server-side instead. Numbers go to the metrics table and charts rather than paragraphs.
 6. **Quality pass on the server.** Unknown citations are dropped, charts without valid sources or with mixed periods are removed, duplicate risks and catalysts are collapsed, and uncited sources are noted.
 7. **Brief by default.** The workspace opens on the executive brief plus one figure; the full report is one toggle away. Printing always produces the full report.
 
