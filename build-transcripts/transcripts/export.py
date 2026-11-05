@@ -22,7 +22,7 @@ KEY_PATTERNS = [
 _local = pathlib.Path(__file__).with_name("redact.local")
 _lines = _local.read_text().split() if _local.exists() else []
 LITERALS = [l for l in _lines if not l.startswith("word:")]
-WORDS = [re.compile(r"\b" + re.escape(l[5:]) + r"\b", re.I) for l in _lines if l.startswith("word:")]
+WORDS = [re.compile(re.escape(l[5:]), re.I) for l in _lines if l.startswith("word:")]
 
 def redact(s: str) -> str:
     # Patterns first (they match whole keys); literals last (fragments, prefixes, words).
