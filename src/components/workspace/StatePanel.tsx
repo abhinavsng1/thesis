@@ -19,7 +19,7 @@ export function StatePanel({ view, mode, onCancel, onRetry }: { view: JobView; m
     }
     return (
       <div className="panel p-6 sm:p-8">
-        <ResearchProgress view={view} onCancel={onCancel} />
+        <ResearchProgress view={view} onCancel={onCancel} question={view.item?.question} />
       </div>
     );
   }

@@ -53,7 +53,7 @@ function useElapsed(since: string | undefined, running: boolean): string {
   return `${Math.floor(sec / 60)}:${String(sec % 60).padStart(2, "0")}`;
 }
 
-export function ResearchProgress({ view, onCancel }: { view: JobView; onCancel: () => void }) {
+export function ResearchProgress({ view, onCancel, question }: { view: JobView; onCancel: () => void; question?: string }) {
   const phase = phaseOf(view.trace, view.status);
   const phaseIndex = PHASES.findIndex((p) => p.id === phase);
   const active = view.status !== "completed";
@@ -63,13 +63,14 @@ export function ResearchProgress({ view, onCancel }: { view: JobView; onCancel: 
 
   return (
     <section aria-live="polite" aria-busy={active}>
+      {question && <h1 className="h2 mb-5 text-[24px] text-ink sm:text-[28px]">{question}</h1>}
       <PhaseRail phaseIndex={phaseIndex} phase={phase} right={`${elapsed} elapsed · ${view.trace.length} steps`} />
 
-      <div className="mt-6 grid gap-8 lg:grid-cols-[minmax(0,1fr)_260px] lg:gap-10">
+      <div className="mt-6 grid gap-8 lg:grid-cols-[minmax(0,1fr)_250px] lg:gap-10">
         <div className="min-w-0">
-          <p className="font-serif text-[21px] leading-snug text-ink sm:text-[23px]">
-            {line}
-            {active && <span className="ml-2 inline-block h-2 w-2 rounded-full bg-teal align-middle pulse" aria-hidden="true" />}
+          <p key={line} className="anim-fade flex items-center gap-2 text-[15.5px] leading-snug text-ink-2">
+            {active && <span className="inline-block h-2 w-2 shrink-0 rounded-full bg-teal pulse" aria-hidden="true" />}
+            <span className="truncate">{line}</span>
           </p>
 
           {view.status === "synthesizing" ? <SynthesisChecklist synth={view.synth} /> : <StepGroups groups={groups} live={active} />}
@@ -149,7 +150,7 @@ export function StepGroups({ groups, live, defaultExpandAll = false }: { groups:
           const expandable = g.kind === "search" || g.kind === "read" || g.kind === "plan" || g.kind === "note";
           const time = new Date(g.at).toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" });
           return (
-            <li key={`${g.at}-${i}`} className="py-2">
+            <li key={`${g.at}-${i}`} className="anim-rise py-2">
               <button
                 type="button"
                 className={`grid w-full grid-cols-[1.25rem_1fr_auto] items-start gap-x-3 text-left ${expandable ? "cursor-pointer" : "cursor-default"}`}
@@ -165,7 +166,11 @@ export function StepGroups({ groups, live, defaultExpandAll = false }: { groups:
                   {expandable && <ChevronDown className={`h-3.5 w-3.5 transition-transform ${isOpen ? "rotate-180" : ""}`} aria-hidden="true" />}
                 </span>
               </button>
-              {isOpen && expandable && <GroupBody g={g} />}
+              {expandable && (
+                <div className="unfold" data-open={isOpen}>
+                  <div>{isOpen && <GroupBody g={g} />}</div>
+                </div>
+              )}
             </li>
           );
         })}
@@ -174,32 +179,51 @@ export function StepGroups({ groups, live, defaultExpandAll = false }: { groups:
   );
 }
 
+const SHOW_OBJECTIVES = 3;
+const SHOW_QUERIES = 6;
+
 function GroupBody({ g }: { g: Group }) {
+  const [more, setMore] = useState(false);
+  const objectives = more ? g.objectives : g.objectives.slice(-SHOW_OBJECTIVES);
+  const queries = more ? g.queries : g.queries.slice(-SHOW_QUERIES);
+  const hiddenO = g.objectives.length - objectives.length;
+  const hiddenQ = g.queries.length - queries.length;
   return (
     <div className="ml-8 mt-2 space-y-2 pb-1">
       {(g.kind === "plan" || g.kind === "note") && g.text && <p className="text-[14px] leading-[1.55] text-ink-2">{g.text}</p>}
       {g.kind === "search" && (
         <>
-          {g.objectives.map((o, i) => (
-            <p key={i} className="text-[14px] leading-[1.5] text-ink-2">
-              {o}
-            </p>
-          ))}
-          {g.queries.length > 0 && (
+          {objectives.length > 0 && (
+            <ul className="space-y-1">
+              {objectives.map((o, i) => (
+                <li key={`${o}-${i}`} className="anim-fade text-[14px] leading-[1.5] text-ink-2">
+                  {o}
+                </li>
+              ))}
+            </ul>
+          )}
+          {queries.length > 0 && (
             <ul className="flex flex-wrap gap-1.5" aria-label="Search queries">
-              {g.queries.map((q, i) => (
-                <li key={i} className="rounded-[6px] border border-rule bg-paper px-2 py-0.5 text-[12.5px] text-ink-2">
+              {queries.map((q, i) => (
+                <li key={`${q}-${i}`} className="chip-in rounded-[6px] border border-rule bg-paper px-2 py-0.5 text-[12.5px] text-ink-2">
                   {q}
                 </li>
               ))}
             </ul>
+          )}
+          {(hiddenO > 0 || hiddenQ > 0) && (
+            <button type="button" className="text-[12.5px] font-semibold text-teal-deep hover:underline" onClick={() => setMore(true)}>
+              Show {hiddenO > 0 ? `${hiddenO} earlier ${hiddenO === 1 ? "objective" : "objectives"}` : ""}
+              {hiddenO > 0 && hiddenQ > 0 ? " and " : ""}
+              {hiddenQ > 0 ? `${hiddenQ} earlier ${hiddenQ === 1 ? "query" : "queries"}` : ""}
+            </button>
           )}
         </>
       )}
       {g.kind === "read" && (
         <ul className="space-y-1">
           {g.docs.map((d) => (
-            <li key={d.url ?? d.text} className="text-[14px] leading-[1.45]">
+            <li key={d.url ?? d.text} className="anim-fade text-[14px] leading-[1.45]">
               {d.url ? (
                 <a href={d.url} target="_blank" rel="noopener noreferrer" className="inline-flex max-w-full items-center gap-1.5 text-teal-deep hover:underline">
                   <span className="truncate">{d.text}</span>
@@ -266,7 +290,7 @@ function SourcesPanel({ trace, stats, depth, processor }: { trace: TraceEntry[];
       {hosts.length > 0 && (
         <ul className="mt-4 divide-y divide-rule border-t border-rule" aria-label="Sources read, by site">
           {hosts.map(([host, { count, url }]) => (
-            <li key={host}>
+            <li key={host} className="anim-fade">
               <a href={url} target="_blank" rel="noopener noreferrer" className="group flex items-center justify-between gap-2 py-1.5 text-[13.5px]" title={url}>
                 <span className="flex min-w-0 items-center gap-2">
                   <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-[5px] bg-panel text-[10px] font-bold uppercase text-ink-2" aria-hidden="true">

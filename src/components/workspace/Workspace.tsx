@@ -61,7 +61,9 @@ export function Workspace({ id, mode }: { id: string; mode: AppMode }) {
               <span aria-hidden="true">/</span>
               <StatusBadge status={view.status} />
             </p>
-            {question && !report && <p className="mt-1 truncate font-serif text-[19px] text-ink">{question}</p>}
+            {question && !report && view.status !== "queued" && view.status !== "researching" && view.status !== "synthesizing" && (
+              <p className="mt-1 truncate font-serif text-[19px] text-ink">{question}</p>
+            )}
           </div>
           {report && (
             <Toolbar
