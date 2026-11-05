@@ -1,6 +1,6 @@
 import type { ActivityEvent } from "@/lib/schema/request";
 import type { TraceEntry, TraceStats } from "@/lib/client/history";
-import { LiveTrace } from "./LiveTrace";
+import { Timeline, groupSteps } from "./ResearchProgress";
 
 export function ActivityLog({ events, trace = [], stats = null, defaultOpen = false }: { events: ActivityEvent[]; trace?: TraceEntry[]; stats?: TraceStats | null; defaultOpen?: boolean }) {
   return (
@@ -10,8 +10,15 @@ export function ActivityLog({ events, trace = [], stats = null, defaultOpen = fa
       </summary>
       {trace.length > 0 && (
         <div className="border-t border-rule px-4 py-4">
-          <p className="meta mb-3">What the research agent did</p>
-          <LiveTrace trace={trace} stats={stats} live={false} streamState="closed" />
+          <div className="flex flex-wrap items-baseline justify-between gap-2">
+            <p className="meta">What the research agent did</p>
+            {stats && (
+              <p className="text-[12.5px] text-muted">
+                {stats.read.toLocaleString()} sources read of {stats.considered.toLocaleString()} considered
+              </p>
+            )}
+          </div>
+          <Timeline blocks={groupSteps(trace)} live={false} />
         </div>
       )}
       <ol className="divide-y divide-rule border-t border-rule">

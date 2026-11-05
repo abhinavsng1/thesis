@@ -11,7 +11,15 @@ import { HORIZON_LABELS, type Horizon } from "@/lib/schema/request";
  * Zod by the SDK before we accept it, then re-validated server-side.
  */
 
+/** Observable progress of the synthesis call: real token counts and the sections the model has reached. */
+export interface SynthesisProgress {
+  attempt: number;
+  outputTokens: number;
+  sections: string[];
+}
+
 export interface SynthesisInput {
+  onProgress?: (p: SynthesisProgress) => void;
   question: string;
   depth: "quick" | "deep";
   horizon?: string;
@@ -207,15 +215,35 @@ export function buildUserPrompt(input: Omit<SynthesisInput, "client" | "model" |
 
 export async function synthesizeReport(input: SynthesisInput): Promise<SynthesisResult> {
   const client = input.client ?? new Anthropic({ maxRetries: 2, timeout: 240_000 });
-  const call = async (extraUser?: string) => {
+  const call = async (attempt: number, extraUser?: string) => {
     try {
-      return await client.messages.create({
+      const stream = client.messages.stream({
         model: input.model,
         max_tokens: 16_000,
         system: [{ type: "text", text: SYSTEM_PROMPT, cache_control: { type: "ephemeral" } }],
         messages: [{ role: "user", content: buildUserPrompt(input) + (extraUser ? `\n\n${extraUser}` : "") }],
         output_config: { effort: input.effort },
       });
+      if (input.onProgress) {
+        let acc = "";
+        let chars = 0;
+        let lastEmit = 0;
+        const seen: string[] = [];
+        stream.on("text", (delta) => {
+          acc += delta;
+          chars += delta.length;
+          for (const key of SECTION_KEYS) {
+            if (!seen.includes(key) && acc.includes(`"${key}"`)) seen.push(key);
+          }
+          const t = Date.now();
+          if (t - lastEmit > 400) {
+            lastEmit = t;
+            // Output tokens are only known at the end; report a character-based estimate until then, labelled as such by the UI.
+            input.onProgress?.({ attempt, outputTokens: Math.round(chars / 4), sections: [...seen] });
+          }
+        });
+      }
+      return await stream.finalMessage();
     } catch (err) {
       if (err instanceof Anthropic.AuthenticationError) throw new SynthesisError("Synthesis model rejected the API key.", false);
       if (err instanceof Anthropic.RateLimitError) throw new SynthesisError("Synthesis model rate limit reached. Try again shortly.", true);
@@ -233,7 +261,7 @@ export async function synthesizeReport(input: SynthesisInput): Promise<Synthesis
   const totals = { model: input.model, inputTokens: 0, outputTokens: 0, cacheReadTokens: 0 };
   let lastProblem = "";
   for (let attempt = 0; attempt < 2 && !output; attempt++) {
-    const message = await call(attempt === 0 ? undefined : `Your previous answer was not valid JSON for the schema (${lastProblem.slice(0, 300)}). Return only the corrected JSON object.`);
+    const message = await call(attempt + 1, attempt === 0 ? undefined : `Your previous answer was not valid JSON for the schema (${lastProblem.slice(0, 300)}). Return only the corrected JSON object.`);
     if (message.stop_reason === "refusal") throw new SynthesisError("Synthesis model declined this request.", false);
     if (message.stop_reason === "max_tokens") throw new SynthesisError("Synthesis output was cut off; retry with a smaller budget.", true);
     const text = message.content.filter((b): b is Anthropic.TextBlock => b.type === "text").map((b) => b.text).join("");
@@ -258,6 +286,9 @@ export async function synthesizeReport(input: SynthesisInput): Promise<Synthesis
   const usage: SynthesisResult["usage"] = { model: totals.model, inputTokens: totals.inputTokens, outputTokens: totals.outputTokens, cacheReadTokens: totals.cacheReadTokens || undefined };
   return { output, usage };
 }
+
+/** Top-level report keys in the order the model writes them; used to report drafting progress. */
+export const SECTION_KEYS = ["title", "stance", "brief", "thesis", "metrics", "charts", "scenarios", "risks", "catalysts", "limitations"] as const;
 
 /** Pulls the first JSON object out of a text response, tolerating code fences or stray prose. */
 export function extractJson(text: string): unknown {

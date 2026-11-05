@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { Report } from "@/lib/schema/report";
 import type { ActivityEvent, JobStatus } from "@/lib/schema/request";
-import { ApiError, fetchReport, fetchStatus } from "./api";
+import { ApiError, fetchReport, fetchReportStream, fetchStatus, type ReportProgressEvent } from "./api";
 import { getHistoryItem, patchHistory, upsertHistory, type HistoryItem, type TraceEntry, type TraceStats } from "./history";
 
 /**
@@ -28,6 +28,20 @@ export interface JobView {
   trace: TraceEntry[];
   traceStats: TraceStats | null;
   streamState: "idle" | "open" | "reconnecting" | "closed";
+  /** Observable progress of report synthesis (streamed from the server). */
+  synth: SynthState | null;
+}
+
+export interface SynthState {
+  startedAt: string;
+  sources?: number;
+  facts?: number;
+  metrics?: number;
+  truncated?: boolean;
+  attempt?: number;
+  outputTokensEstimate?: number;
+  sections: string[];
+  stage: "fetching" | "evidence" | "drafting" | "validating" | "done";
 }
 
 const TRACE_MAX = 300;
@@ -42,7 +56,7 @@ function now() {
 
 export function useResearchJob(id: string) {
   const isSample = id.startsWith("sample-");
-  const [view, setView] = useState<JobView>({ id, status: "loading", item: null, report: null, error: null, retryable: false, events: [], lastPolledAt: null, cancelled: false, trace: [], traceStats: null, streamState: "idle" });
+  const [view, setView] = useState<JobView>({ id, status: "loading", item: null, report: null, error: null, retryable: false, events: [], lastPolledAt: null, cancelled: false, trace: [], traceStats: null, streamState: "idle", synth: null });
   const source = useRef<EventSource | null>(null);
   const openStreamRef = useRef<() => void>(() => {});
   const seen = useRef<Set<string>>(new Set());
@@ -155,10 +169,27 @@ export function useResearchJob(id: string) {
     });
     patchHistory(id, { status: "synthesizing" });
     pushEvent({ type: "synthesis.started", message: "Research complete. Synthesizing the report from the evidence pack." });
+    setView((v) => ({ ...v, synth: { startedAt: now(), sections: [], stage: "fetching" } }));
     try {
       const ctrl = new AbortController();
       abort.current = ctrl;
-      const { report } = await fetchReport(id, { question: item.question, depth: item.depth, horizon: item.horizon, budgetWords: item.budgetWords }, ctrl.signal);
+      const onProgress = (p: ReportProgressEvent) =>
+        setView((v) => {
+          const base: SynthState = v.synth ?? { startedAt: now(), sections: [], stage: "fetching" };
+          switch (p.stage) {
+            case "result":
+              return { ...v, synth: { ...base, stage: "evidence", sources: p.sources } };
+            case "evidence":
+              return { ...v, synth: { ...base, stage: "evidence", sources: p.sources, facts: p.facts, metrics: p.metrics, truncated: p.truncated } };
+            case "drafting":
+              return { ...v, synth: { ...base, stage: "drafting", attempt: p.attempt, outputTokensEstimate: p.outputTokensEstimate, sections: p.sections } };
+            case "validating":
+              return { ...v, synth: { ...base, stage: "validating" } };
+            case "done":
+              return { ...v, synth: { ...base, stage: "done" } };
+          }
+        });
+      const { report } = await fetchReportStream(id, { question: item.question, depth: item.depth, horizon: item.horizon, budgetWords: item.budgetWords }, onProgress, ctrl.signal);
       const detail: ActivityEvent["detail"] = {
         sources: report.sources.length,
         charts: report.charts.length,

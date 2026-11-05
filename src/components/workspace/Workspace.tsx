@@ -89,7 +89,7 @@ export function Workspace({ id, mode }: { id: string; mode: AppMode }) {
             </div>
           </div>
         ) : (
-          <div className="mx-auto max-w-[760px]">
+          <div className={`mx-auto ${view.status === "queued" || view.status === "researching" || view.status === "synthesizing" ? "max-w-[1040px]" : "max-w-[760px]"}`}>
             <StatePanel view={view} mode={mode} onCancel={cancel} onRetry={retry} />
             {!isSample && view.events.length > 0 && (
               <div className="mt-8">

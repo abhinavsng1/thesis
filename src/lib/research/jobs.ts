@@ -2,7 +2,7 @@ import { getConfig } from "./config";
 import { ParallelProvider } from "./parallel";
 import { ProviderError, type ResearchProvider } from "./provider";
 import { normalizeEvidence } from "./evidence";
-import { synthesizeReport, SynthesisError } from "./synthesis";
+import { synthesizeReport, SynthesisError, type SynthesisProgress } from "./synthesis";
 import { validateAndRepair } from "@/lib/report/validate";
 import { computeStats } from "@/lib/report/stats";
 import { ReportSchema, type Report } from "@/lib/schema/report";
@@ -65,6 +65,14 @@ export function _setProviderForTests(p: ResearchProvider | null) {
   inflight.clear();
   created.clear();
 }
+
+/** Observable stages of report building, streamed to the browser during synthesis. */
+export type ReportProgress =
+  | { stage: "result"; sources: number }
+  | { stage: "evidence"; sources: number; facts: number; metrics: number; truncated: boolean }
+  | { stage: "drafting"; attempt: number; outputTokensEstimate: number; sections: string[] }
+  | { stage: "validating"; charts: number; citations: number }
+  | { stage: "done"; words: number };
 
 export class JobError extends Error {
   constructor(message: string, public readonly status: number, public readonly retryable: boolean) {
@@ -164,7 +172,7 @@ export async function getJobStatus(id: string): Promise<JobStatusResponse> {
  * Returns the finished report, synthesizing it on first request after the
  * provider run completes. Concurrent callers share one in-flight synthesis.
  */
-export async function getJobReport(id: string, requestHint?: Partial<ResearchRequest>): Promise<{ report: Report; events: ActivityEvent[] }> {
+export async function getJobReport(id: string, requestHint?: Partial<ResearchRequest>, onProgress?: (p: ReportProgress) => void): Promise<{ report: Report; events: ActivityEvent[] }> {
   if (isSampleId(id)) {
     const sample = getSampleReport(id);
     if (!sample) throw new JobError("Sample report not found.", 404, false);
@@ -174,7 +182,7 @@ export async function getJobReport(id: string, requestHint?: Partial<ResearchReq
   if (cached) return { report: cached, events: [] };
   let p = inflight.get(id);
   if (!p) {
-    p = buildReport(id, requestHint).finally(() => inflight.delete(id));
+    p = buildReport(id, requestHint, onProgress).finally(() => inflight.delete(id));
     inflight.set(id, p);
   }
   try {
@@ -185,11 +193,12 @@ export async function getJobReport(id: string, requestHint?: Partial<ResearchReq
   }
 }
 
-async function buildReport(id: string, hint?: Partial<ResearchRequest>): Promise<Report> {
+async function buildReport(id: string, hint?: Partial<ResearchRequest>, onProgress?: (p: ReportProgress) => void): Promise<Report> {
   const provider = getProvider();
   const cfg = getConfig();
   const result = await provider.getResult(id);
   if (result.run.status !== "completed") throw new JobError("Research is not finished yet.", 409, true);
+  onProgress?.({ stage: "result", sources: new Set(result.basis.flatMap((b) => b.citations.map((c) => c.url))).size });
   const meta = getFresh(created, id);
   const question = meta?.request.question ?? hint?.question;
   if (!question) throw new JobError("The original question for this run is unknown on this server. Reopen the report from the browser that created it.", 400, false);
@@ -200,8 +209,19 @@ async function buildReport(id: string, hint?: Partial<ResearchRequest>): Promise
 
   const evidence = normalizeEvidence(result, { retrievedAt, maxChars: cfg.synthesis.maxEvidenceChars });
   if (evidence.sources.length === 0) throw new JobError("The research run returned no citable sources, so no report was produced.", 502, true);
+  onProgress?.({ stage: "evidence", sources: evidence.sources.length, facts: evidence.pack?.facts.length ?? 0, metrics: evidence.pack?.metrics.length ?? 0, truncated: evidence.truncated });
 
-  const synth = await synthesizeReport({ question, depth, horizon, budgetWords, evidence, model: cfg.synthesis.model, effort: cfg.synthesis.effort });
+  const synth = await synthesizeReport({
+    question,
+    depth,
+    horizon,
+    budgetWords,
+    evidence,
+    model: cfg.synthesis.model,
+    effort: cfg.synthesis.effort,
+    onProgress: (sp: SynthesisProgress) => onProgress?.({ stage: "drafting", attempt: sp.attempt, outputTokensEstimate: sp.outputTokens, sections: sp.sections }),
+  });
+  onProgress?.({ stage: "validating", charts: synth.output.charts.length, citations: evidence.sources.length });
   const processor = result.run.processor ?? meta?.processor ?? provider.processorFor(depth);
   const base = {
     id,
@@ -223,5 +243,6 @@ async function buildReport(id: string, hint?: Partial<ResearchRequest>): Promise
   const candidate = ReportSchema.parse(withStats);
   const { report } = validateAndRepair(candidate);
   setFresh(reports, id, report);
+  onProgress?.({ stage: "done", words: report.stats.wordCount });
   return report;
 }

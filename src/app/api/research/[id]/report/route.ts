@@ -1,6 +1,9 @@
 import { NextResponse, connection } from "next/server";
 import { getConfig } from "@/lib/research/config";
-import { getJobReport } from "@/lib/research/jobs";
+import { getJobReport, JobError, type ReportProgress } from "@/lib/research/jobs";
+import { ProviderError } from "@/lib/research/provider";
+
+export const maxDuration = 300;
 import { isSampleId } from "@/lib/research/samples";
 import { errorResponse } from "@/lib/research/http";
 import { ResearchRequestSchema } from "@/lib/schema/request";
@@ -36,5 +39,33 @@ export async function POST(req: Request, ctx: RouteContext<"/api/research/[id]/r
   await connection();
   const { id } = await ctx.params;
   const body = await req.json().catch(() => undefined);
-  return handle(id, body);
+  if (!req.headers.get("accept")?.includes("text/event-stream")) return handle(id, body);
+
+  // Streaming variant: progress events while the report is built, then the report itself.
+  if (!ID_RE.test(id)) return NextResponse.json({ error: "Invalid job id.", retryable: false }, { status: 400 });
+  if (!isSampleId(id) && getConfig().mode !== "live") {
+    return NextResponse.json({ error: "Live research is not configured on this deployment.", code: "live_research_disabled", retryable: false }, { status: 503 });
+  }
+  const parsedHint = body ? ResearchRequestSchema.partial().safeParse(body) : undefined;
+  const encoder = new TextEncoder();
+  const stream = new ReadableStream<Uint8Array>({
+    async start(controller) {
+      const send = (event: string, data: unknown) => controller.enqueue(encoder.encode(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`));
+      send("open", { at: new Date().toISOString() });
+      const heartbeat = setInterval(() => controller.enqueue(encoder.encode(": keep-alive\n\n")), 15_000);
+      try {
+        const { report } = await getJobReport(id, parsedHint?.success ? parsedHint.data : undefined, (p: ReportProgress) => send("progress", p));
+        send("report", { report });
+      } catch (err) {
+        const status = err instanceof JobError ? err.status : err instanceof ProviderError ? 502 : 500;
+        const message = err instanceof JobError || err instanceof ProviderError ? err.message : "Unexpected server error.";
+        const retryable = err instanceof JobError || err instanceof ProviderError ? err.retryable : true;
+        send("failed", { error: message, retryable, status });
+      } finally {
+        clearInterval(heartbeat);
+        controller.close();
+      }
+    },
+  });
+  return new Response(stream, { headers: { "content-type": "text/event-stream; charset=utf-8", "cache-control": "no-cache, no-transform", "x-accel-buffering": "no" } });
 }

@@ -53,3 +53,62 @@ export function fetchReport(id: string, hint?: ResearchRequestInput, signal?: Ab
     cache: "no-store",
   }).then((r) => parse<{ report: Report }>(r));
 }
+
+export type ReportProgressEvent =
+  | { stage: "result"; sources: number }
+  | { stage: "evidence"; sources: number; facts: number; metrics: number; truncated: boolean }
+  | { stage: "drafting"; attempt: number; outputTokensEstimate: number; sections: string[] }
+  | { stage: "validating"; charts: number; citations: number }
+  | { stage: "done"; words: number };
+
+/** Streams report-building progress (SSE over a POST) and resolves with the report. */
+export async function fetchReportStream(
+  id: string,
+  hint: ResearchRequestInput,
+  onProgress: (p: ReportProgressEvent) => void,
+  signal?: AbortSignal,
+): Promise<{ report: Report }> {
+  const res = await fetch(`/api/research/${encodeURIComponent(id)}/report`, {
+    method: "POST",
+    headers: { "content-type": "application/json", accept: "text/event-stream" },
+    body: JSON.stringify(hint),
+    signal,
+    cache: "no-store",
+  });
+  if (!res.ok || !res.body || !res.headers.get("content-type")?.includes("text/event-stream")) return parse<{ report: Report }>(res);
+  const reader = res.body.pipeThrough(new TextDecoderStream()).getReader();
+  let buffer = "";
+  let result: { report: Report } | null = null;
+  let failure: ApiError | null = null;
+  const handle = (block: string) => {
+    const lines = block.split("\n");
+    const event = lines.find((l) => l.startsWith("event:"))?.slice(6).trim();
+    const data = lines.filter((l) => l.startsWith("data:")).map((l) => l.slice(5).trim()).join("\n");
+    if (!event || !data) return;
+    let payload: unknown;
+    try {
+      payload = JSON.parse(data);
+    } catch {
+      return;
+    }
+    if (event === "progress") onProgress(payload as ReportProgressEvent);
+    else if (event === "report") result = payload as { report: Report };
+    else if (event === "failed") {
+      const f = payload as { error: string; retryable: boolean; status: number };
+      failure = new ApiError(f.error, f.status, f.retryable);
+    }
+  };
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    buffer += value;
+    let idx: number;
+    while ((idx = buffer.indexOf("\n\n")) !== -1) {
+      handle(buffer.slice(0, idx));
+      buffer = buffer.slice(idx + 2);
+    }
+  }
+  if (failure) throw failure;
+  if (!result) throw new ApiError("The report stream ended without a report.", 502, true);
+  return result;
+}
