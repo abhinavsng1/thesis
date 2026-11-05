@@ -4,7 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import type { Report } from "@/lib/schema/report";
 import type { ActivityEvent, JobStatus } from "@/lib/schema/request";
 import { ApiError, fetchReport, fetchStatus } from "./api";
-import { getHistoryItem, patchHistory, upsertHistory, type HistoryItem } from "./history";
+import { getHistoryItem, patchHistory, upsertHistory, type HistoryItem, type TraceEntry, type TraceStats } from "./history";
 
 /**
  * Drives one research job from the browser: polls status, triggers synthesis
@@ -24,7 +24,13 @@ export interface JobView {
   events: ActivityEvent[];
   lastPolledAt: string | null;
   cancelled: boolean;
+  /** Live provider trace: what the research agent is doing right now. */
+  trace: TraceEntry[];
+  traceStats: TraceStats | null;
+  streamState: "idle" | "open" | "reconnecting" | "closed";
 }
+
+const TRACE_MAX = 300;
 
 const POLL_FAST_MS = 4000;
 const POLL_SLOW_MS = 8000;
@@ -36,7 +42,11 @@ function now() {
 
 export function useResearchJob(id: string) {
   const isSample = id.startsWith("sample-");
-  const [view, setView] = useState<JobView>({ id, status: "loading", item: null, report: null, error: null, retryable: false, events: [], lastPolledAt: null, cancelled: false });
+  const [view, setView] = useState<JobView>({ id, status: "loading", item: null, report: null, error: null, retryable: false, events: [], lastPolledAt: null, cancelled: false, trace: [], traceStats: null, streamState: "idle" });
+  const source = useRef<EventSource | null>(null);
+  const openStreamRef = useRef<() => void>(() => {});
+  const seen = useRef<Set<string>>(new Set());
+  const persistTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const abort = useRef<AbortController | null>(null);
   const startedAt = useRef<number>(0);
@@ -53,14 +63,96 @@ export function useResearchJob(id: string) {
     });
   }, [id, isSample]);
 
+  const persistTraceSoon = useCallback(() => {
+    if (persistTimer.current) return;
+    persistTimer.current = setTimeout(() => {
+      persistTimer.current = null;
+      setView((v) => {
+        patchHistory(id, { trace: v.trace, traceStats: v.traceStats ?? undefined });
+        return v;
+      });
+    }, 1500);
+  }, [id]);
+
+  const closeStream = useCallback(() => {
+    source.current?.close();
+    source.current = null;
+    setView((v) => (v.streamState === "closed" ? v : { ...v, streamState: "closed" }));
+  }, []);
+
+  /** Opens the live provider trace. The browser's EventSource reconnects on its own; the provider replays messages, so entries are deduplicated. */
+  const openStream = useCallback(() => {
+    if (source.current || typeof EventSource === "undefined") return;
+    const es = new EventSource(`/api/research/${encodeURIComponent(id)}/events`);
+    source.current = es;
+    setView((v) => ({ ...v, streamState: "open" }));
+    const push = (entry: TraceEntry) => {
+      const key = `${entry.type}|${entry.at}|${entry.message}`;
+      if (seen.current.has(key)) return;
+      seen.current.add(key);
+      setView((v) => ({ ...v, trace: [...v.trace, entry].slice(-TRACE_MAX) }));
+      persistTraceSoon();
+    };
+    for (const type of ["plan", "search", "result", "tool_call", "exec_status", "extract"] as const) {
+      es.addEventListener(type, (e) => {
+        try {
+          const d = JSON.parse((e as MessageEvent).data) as { message?: string; timestamp?: string };
+          if (d.message) push({ at: d.timestamp ?? now(), type, message: d.message });
+        } catch {
+          /* ignore malformed */
+        }
+      });
+    }
+    es.addEventListener("stats", (e) => {
+      try {
+        const d = JSON.parse((e as MessageEvent).data) as { stats?: Omit<TraceStats, "at"> };
+        if (d.stats) {
+          setView((v) => ({ ...v, traceStats: { ...d.stats!, at: now() } }));
+          persistTraceSoon();
+        }
+      } catch {
+        /* ignore */
+      }
+    });
+    es.addEventListener("error", (e) => {
+      // Provider-reported error event (not a connection error): surface it in the trace.
+      if (e instanceof MessageEvent && typeof e.data === "string") {
+        try {
+          const d = JSON.parse(e.data) as { message?: string };
+          if (d.message) push({ at: now(), type: "error", message: d.message });
+        } catch {
+          /* ignore */
+        }
+      }
+    });
+    es.addEventListener("end", () => {
+      // Upstream closed (run finished or 570 s budget). Reconnect only while the job is still active.
+      es.close();
+      source.current = null;
+      setView((v) => {
+        if (v.status === "queued" || v.status === "researching") {
+          setTimeout(() => openStreamRef.current(), 2000);
+          return { ...v, streamState: "reconnecting" };
+        }
+        return { ...v, streamState: "closed" };
+      });
+    });
+    es.onerror = () => setView((v) => (v.streamState === "closed" ? v : { ...v, streamState: "reconnecting" }));
+  }, [id, persistTraceSoon]);
+
   const stopPolling = useCallback(() => {
     stopped.current = true;
     if (timer.current) clearTimeout(timer.current);
     abort.current?.abort();
-  }, []);
+    closeStream();
+  }, [closeStream]);
 
   const synthesize = useCallback(async (item: HistoryItem) => {
-    setView((v) => ({ ...v, status: "synthesizing", error: null }));
+    closeStream();
+    setView((v) => {
+      patchHistory(id, { trace: v.trace, traceStats: v.traceStats ?? undefined });
+      return { ...v, status: "synthesizing", error: null };
+    });
     patchHistory(id, { status: "synthesizing" });
     pushEvent({ type: "synthesis.started", message: "Research complete. Synthesizing the report from the evidence pack." });
     try {
@@ -85,10 +177,11 @@ export function useResearchJob(id: string) {
       setView((v) => ({ ...v, status: "failed", error: e.message, retryable: e.retryable }));
       pushEvent({ type: "synthesis.failed", message: e.message });
     }
-  }, [id, pushEvent]);
+  }, [id, pushEvent, closeStream]);
 
   const poll = useCallback(async (item: HistoryItem) => {
     if (stopped.current) return;
+    if (!source.current) openStream();
     try {
       const ctrl = new AbortController();
       abort.current = ctrl;
@@ -104,6 +197,7 @@ export function useResearchJob(id: string) {
         return;
       }
       if (s.status === "failed" || s.status === "cancelled") {
+        closeStream();
         patchHistory(id, { status: s.status, error: s.error });
         setView((v) => ({ ...v, status: s.status, error: s.error ?? null, retryable: s.retryable ?? true }));
         pushEvent({ type: `job.${s.status}`, message: s.error ?? `Job ${s.status}.` });
@@ -126,11 +220,12 @@ export function useResearchJob(id: string) {
       setView((v) => ({ ...v, status: "failed", error: e.message, retryable: e.retryable }));
       pushEvent({ type: "job.failed", message: e.message });
     }
-  }, [id, pushEvent, synthesize]);
+  }, [id, pushEvent, synthesize, openStream, closeStream]);
 
   useEffect(() => {
     pollRef.current = poll;
-  }, [poll]);
+    openStreamRef.current = openStream;
+  }, [poll, openStream]);
 
   useEffect(() => {
     stopped.current = false;
@@ -155,11 +250,13 @@ export function useResearchJob(id: string) {
         setView((v) => ({ ...v, status: "missing", error: "This research is not in this browser's history. Reports are stored locally in the browser that created them." }));
         return;
       }
+      const restored = { trace: item.trace ?? [], traceStats: item.traceStats ?? null };
+      for (const t of restored.trace) seen.current.add(`${t.type}|${t.at}|${t.message}`);
       if (item.report) {
-        setView((v) => ({ ...v, item, events: item.events ?? [], status: "completed", report: item.report ?? null }));
+        setView((v) => ({ ...v, item, events: item.events ?? [], status: "completed", report: item.report ?? null, ...restored }));
         return;
       }
-      setView((v) => ({ ...v, item, events: item.events ?? [], status: item.status, error: item.error ?? null, retryable: true }));
+      setView((v) => ({ ...v, item, events: item.events ?? [], status: item.status, error: item.error ?? null, retryable: true, ...restored }));
       if (item.status === "failed" || item.status === "cancelled") return;
       if (item.status === "synthesizing") await synthesize(item);
       else await poll(item);

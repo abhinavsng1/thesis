@@ -7,8 +7,26 @@ import type { ActivityEvent, Depth, Horizon, JobStatus } from "@/lib/schema/requ
  * every call degrades to an in-memory fallback and reports availability.
  */
 
+/** One observable step from the provider's live progress stream. */
+export interface TraceEntry {
+  at: string;
+  type: "plan" | "search" | "result" | "tool_call" | "exec_status" | "extract" | "status" | "error";
+  message: string;
+}
+
+export interface TraceStats {
+  considered: number;
+  read: number;
+  sample: string[];
+  progress: number | null;
+  at: string;
+}
+
 export interface HistoryItem {
   id: string;
+  /** Live research trace (provider progress messages), capped. */
+  trace?: TraceEntry[];
+  traceStats?: TraceStats;
   question: string;
   depth: Depth;
   horizon?: Horizon;

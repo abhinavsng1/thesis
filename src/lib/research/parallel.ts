@@ -2,6 +2,7 @@ import { z } from "zod";
 import type {
   CreateRunInput,
   ProviderBasis,
+  ProviderEvent,
   ProviderResult,
   ProviderRun,
   ProviderRunStatus,
@@ -18,6 +19,7 @@ import { HORIZON_LABELS, type Depth, type Horizon } from "@/lib/schema/request";
  *   POST https://api.parallel.ai/v1/tasks/runs           → 202, TaskRun
  *   GET  https://api.parallel.ai/v1/tasks/runs/{run_id}  → TaskRun
  *   GET  https://api.parallel.ai/v1/tasks/runs/{run_id}/result?timeout=N → TaskRunResult (408 while active)
+ *   GET  https://api.parallel.ai/v1/tasks/runs/{run_id}/events → text/event-stream (task_run.state, task_run.progress_msg.*, task_run.progress_stats, error)
  * Auth header: x-api-key. No cancel endpoint is documented for task runs.
  */
 
@@ -195,6 +197,8 @@ export class ParallelProvider implements ResearchProvider {
       task_spec: {
         output_schema: { type: "json", json_schema: EVIDENCE_PACK_JSON_SCHEMA },
       },
+      // Progress events (plan, searches, sources read) for the live activity feed. Cannot be enabled after creation.
+      enable_events: true,
       metadata: {
         app: "thesis",
         depth: input.depth,
@@ -239,4 +243,85 @@ export class ParallelProvider implements ResearchProvider {
       basis,
     };
   }
+
+  /**
+   * Live progress stream. Parallel replays all progress messages from the start of the run on
+   * every connection and keeps the stream open for up to 570 s, so the client reconnects freely.
+   */
+  async openEvents(runId: string, signal: AbortSignal): Promise<ReadableStream<ProviderEvent>> {
+    let res: Response;
+    try {
+      res = await this.fetchImpl(`${this.opts.baseUrl}/v1/tasks/runs/${encodeURIComponent(runId)}/events`, {
+        method: "GET",
+        headers: { "x-api-key": this.opts.apiKey, accept: "text/event-stream" },
+        signal,
+        cache: "no-store",
+      });
+    } catch {
+      throw new ProviderError("Could not open the research event stream.", "upstream", true);
+    }
+    if (!res.ok || !res.body) await this.fail(res);
+    return res.body!.pipeThrough(new TextDecoderStream()).pipeThrough(sseToProviderEvents());
+  }
+}
+
+/** Parses Server-Sent Events into normalized ProviderEvents, dropping anything we do not recognise. */
+export function sseToProviderEvents(): TransformStream<string, ProviderEvent> {
+  let buffer = "";
+  const flush = (block: string, controller: TransformStreamDefaultController<ProviderEvent>) => {
+    const dataLines = block.split("\n").filter((l) => l.startsWith("data:")).map((l) => l.slice(5).trim());
+    if (!dataLines.length) return;
+    let payload: Record<string, unknown>;
+    try {
+      payload = JSON.parse(dataLines.join("\n"));
+    } catch {
+      return;
+    }
+    const ev = normalizeParallelEvent(payload);
+    if (ev) controller.enqueue(ev);
+  };
+  return new TransformStream<string, ProviderEvent>({
+    transform(chunk, controller) {
+      buffer += chunk;
+      let idx: number;
+      while ((idx = buffer.indexOf("\n\n")) !== -1) {
+        const block = buffer.slice(0, idx);
+        buffer = buffer.slice(idx + 2);
+        flush(block.replace(/\r/g, ""), controller);
+      }
+    },
+    flush(controller) {
+      if (buffer.trim()) flush(buffer.replace(/\r/g, ""), controller);
+      controller.enqueue({ type: "end" });
+    },
+  });
+}
+
+export function normalizeParallelEvent(p: Record<string, unknown>): ProviderEvent | null {
+  const type = typeof p.type === "string" ? p.type : "";
+  const ts = typeof p.timestamp === "string" ? p.timestamp : undefined;
+  if (type === "task_run.state") {
+    const run = (p.run ?? {}) as { status?: string };
+    const parsed = TaskRunSchema.shape.status.safeParse(run.status);
+    return { type: "status", status: parsed.success ? mapStatus(parsed.data) : undefined, timestamp: ts };
+  }
+  if (type.startsWith("task_run.progress_msg.")) {
+    const kind = type.slice("task_run.progress_msg.".length);
+    const message = typeof p.message === "string" ? p.message.trim() : "";
+    if (!message) return null;
+    const allowed = ["plan", "search", "result", "tool_call", "exec_status", "extract"] as const;
+    const k = allowed.find((a) => a === kind);
+    return k ? { type: k, message: message.slice(0, 600), timestamp: ts } : null;
+  }
+  if (type === "task_run.progress_stats") {
+    const st = (p.source_stats ?? {}) as { num_sources_considered?: number; num_sources_read?: number; sources_read_sample?: unknown };
+    const sample = Array.isArray(st.sources_read_sample) ? st.sources_read_sample.filter((u): u is string => typeof u === "string" && /^https?:\/\//i.test(u)).slice(0, 12) : [];
+    const progress = typeof p.progress_meter === "number" && Number.isFinite(p.progress_meter) ? Math.max(0, Math.min(100, p.progress_meter)) : null;
+    return { type: "stats", stats: { considered: Number(st.num_sources_considered ?? 0), read: Number(st.num_sources_read ?? 0), sample, progress } };
+  }
+  if (type === "error") {
+    const err = (p.error ?? {}) as { message?: string };
+    return { type: "error", message: (err.message ?? "Provider reported an error.").slice(0, 300) };
+  }
+  return null;
 }

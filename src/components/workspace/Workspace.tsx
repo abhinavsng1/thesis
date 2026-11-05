@@ -83,7 +83,7 @@ export function Workspace({ id, mode }: { id: string; mode: AppMode }) {
               <ReportDocument report={report} view={docView} />
               {!isSample && (
                 <div className="no-print mt-10">
-                  <ActivityLog events={view.events} />
+                  <ActivityLog events={view.events} trace={view.trace} stats={view.traceStats} />
                 </div>
               )}
             </div>
@@ -93,7 +93,7 @@ export function Workspace({ id, mode }: { id: string; mode: AppMode }) {
             <StatePanel view={view} mode={mode} onCancel={cancel} onRetry={retry} />
             {!isSample && view.events.length > 0 && (
               <div className="mt-8">
-                <ActivityLog events={view.events} defaultOpen />
+                <ActivityLog events={view.events} trace={view.status === "failed" || view.status === "cancelled" ? view.trace : []} stats={view.traceStats} defaultOpen />
               </div>
             )}
           </div>

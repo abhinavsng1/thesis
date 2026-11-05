@@ -4,11 +4,12 @@ import Link from "next/link";
 import { RotateCcw, Square } from "lucide-react";
 import type { AppMode } from "@/lib/research/config";
 import type { JobView } from "@/lib/client/useResearchJob";
+import { LiveTrace } from "./LiveTrace";
 
 const COPY: Record<string, { title: string; body: string }> = {
   loading: { title: "Loading", body: "Fetching this research from the server." },
   queued: { title: "Queued", body: "The research provider has accepted the run and will start shortly." },
-  researching: { title: "Researching", body: "The provider is reading filings, releases and transcripts and assembling a cited evidence pack. Quick runs usually take a few minutes; deep runs can take ten or more." },
+  researching: { title: "Researching", body: "Reading filings, releases and transcripts and assembling a cited evidence pack. Quick runs usually take a few minutes; deep runs can take ten or more." },
   synthesizing: { title: "Synthesizing", body: "Research is complete. The evidence pack is being compressed into a structured report with citations attached to each claim." },
 };
 
@@ -16,14 +17,26 @@ export function StatePanel({ view, mode, onCancel, onRetry }: { view: JobView; m
   const active = view.status === "queued" || view.status === "researching" || view.status === "synthesizing" || view.status === "loading";
   if (active) {
     const c = COPY[view.status];
+    const showTrace = view.status === "queued" || view.status === "researching" || view.status === "synthesizing";
     return (
       <div className="panel p-6 sm:p-8">
         <p className="meta">{c.title}</p>
-        <p className="mt-2 font-serif text-[24px] leading-snug text-ink">{c.body}</p>
-        <p className="mt-4 text-[13.5px] text-muted">
+        <p className="mt-2 font-serif text-[22px] leading-snug text-ink">{c.body}</p>
+        {showTrace && (
+          <div className="mt-5 border-t border-rule pt-4">
+            <div className="mb-3 flex items-center justify-between">
+              <p className="meta">Live research activity</p>
+              <span className="text-[12px] text-muted">
+                {view.status === "synthesizing" ? "Stream closed; writing the report" : view.streamState === "open" ? "Streaming from the provider" : view.streamState === "reconnecting" ? "Reconnecting…" : "Connecting…"}
+              </span>
+            </div>
+            <LiveTrace trace={view.trace} stats={view.traceStats} live={view.status !== "synthesizing"} streamState={view.streamState} />
+          </div>
+        )}
+        <p className="mt-4 text-[13px] text-muted">
           {view.providerStatus ? `Provider status: ${view.providerStatus}. ` : ""}
           {view.lastPolledAt ? `Last checked ${new Date(view.lastPolledAt).toLocaleTimeString()}. ` : ""}
-          This page checks the real job status every few seconds. There is no progress percentage because the provider does not report one.
+          Status is polled every few seconds; the activity above streams directly from the provider and is kept with the report.
         </p>
         {view.status !== "loading" && view.status !== "synthesizing" && (
           <div className="mt-5 flex flex-wrap gap-2">

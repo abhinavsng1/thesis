@@ -1,11 +1,19 @@
 import type { ActivityEvent } from "@/lib/schema/request";
+import type { TraceEntry, TraceStats } from "@/lib/client/history";
+import { LiveTrace } from "./LiveTrace";
 
-export function ActivityLog({ events, defaultOpen = false }: { events: ActivityEvent[]; defaultOpen?: boolean }) {
+export function ActivityLog({ events, trace = [], stats = null, defaultOpen = false }: { events: ActivityEvent[]; trace?: TraceEntry[]; stats?: TraceStats | null; defaultOpen?: boolean }) {
   return (
     <details className="group rounded-[12px] border border-rule bg-paper" open={defaultOpen}>
       <summary className="cursor-pointer select-none px-4 py-3 text-[14px] font-semibold text-ink-2 hover:text-ink">
-        Research activity <span className="font-normal text-muted">({events.length} events, observable only)</span>
+        Research activity <span className="font-normal text-muted">({events.length} job events{trace.length ? `, ${trace.length} agent steps` : ""}, observable only)</span>
       </summary>
+      {trace.length > 0 && (
+        <div className="border-t border-rule px-4 py-4">
+          <p className="meta mb-3">What the research agent did</p>
+          <LiveTrace trace={trace} stats={stats} live={false} streamState="closed" />
+        </div>
+      )}
       <ol className="divide-y divide-rule border-t border-rule">
         {events.length === 0 && <li className="px-4 py-3 text-[13.5px] text-muted">No events recorded yet.</li>}
         {events.map((e, i) => (

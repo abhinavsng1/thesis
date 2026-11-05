@@ -61,6 +61,17 @@ export interface ResearchProvider {
   getResult(runId: string): Promise<ProviderResult>;
   /** Published list price per successful run for the processor, in USD, if known. */
   listPriceUsd(processor: string): number | undefined;
+  /** Opens the provider's live event stream for a run, if supported. Resolves to normalized events. */
+  openEvents?(runId: string, signal: AbortSignal): Promise<ReadableStream<ProviderEvent>>;
+}
+
+/** Normalized live progress event. Only observable provider output; never model reasoning. */
+export interface ProviderEvent {
+  type: "status" | "plan" | "search" | "result" | "tool_call" | "exec_status" | "extract" | "stats" | "error" | "end";
+  message?: string;
+  timestamp?: string;
+  status?: ProviderRunStatus;
+  stats?: { considered: number; read: number; sample: string[]; progress: number | null };
 }
 
 export class ProviderError extends Error {
