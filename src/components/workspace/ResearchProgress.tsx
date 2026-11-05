@@ -201,7 +201,9 @@ export function ResearchProgress({ view, onCancel }: { view: JobView; onCancel: 
   const stats = view.traceStats;
   const endRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
-    endRef.current?.scrollIntoView({ block: "nearest" });
+    // Follow new steps only when the reader is already near the bottom; never yank the page otherwise.
+    const nearBottom = window.innerHeight + window.scrollY >= document.body.scrollHeight - 240;
+    if (nearBottom) endRef.current?.scrollIntoView({ block: "nearest", behavior: "smooth" });
   }, [blocks.length]);
 
   const hostCounts = useMemo(() => {

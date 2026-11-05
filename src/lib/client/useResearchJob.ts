@@ -59,6 +59,7 @@ export function useResearchJob(id: string) {
   const [view, setView] = useState<JobView>({ id, status: "loading", item: null, report: null, error: null, retryable: false, events: [], lastPolledAt: null, cancelled: false, trace: [], traceStats: null, streamState: "idle", synth: null });
   const source = useRef<EventSource | null>(null);
   const openStreamRef = useRef<() => void>(() => {});
+  const streamSawTerminal = useRef(false);
   const seen = useRef<Set<string>>(new Set());
   const persistTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -117,6 +118,14 @@ export function useResearchJob(id: string) {
         }
       });
     }
+    es.addEventListener("status", (e) => {
+      try {
+        const d = JSON.parse((e as MessageEvent).data) as { status?: string };
+        if (d.status && d.status !== "queued" && d.status !== "running") streamSawTerminal.current = true;
+      } catch {
+        /* ignore */
+      }
+    });
     es.addEventListener("stats", (e) => {
       try {
         const d = JSON.parse((e as MessageEvent).data) as { stats?: Omit<TraceStats, "at"> };
@@ -144,7 +153,7 @@ export function useResearchJob(id: string) {
       es.close();
       source.current = null;
       setView((v) => {
-        if (v.status === "queued" || v.status === "researching") {
+        if (!streamSawTerminal.current && (v.status === "queued" || v.status === "researching")) {
           setTimeout(() => openStreamRef.current(), 2000);
           return { ...v, streamState: "reconnecting" };
         }

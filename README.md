@@ -20,7 +20,7 @@ Without credentials the app runs in **demo mode**: the two labelled sample repor
 | --- | --- | --- |
 | `PARALLEL_API_KEY` | Live research | Parallel Task API key. Each run is a paid request. |
 | `ANTHROPIC_API_KEY` | Live research | Report synthesis. |
-| `THESIS_PARALLEL_PROCESSOR_QUICK` | optional | Default `base`. |
+| `THESIS_PARALLEL_PROCESSOR_QUICK` | optional | Default `core`. |
 | `THESIS_PARALLEL_PROCESSOR_DEEP` | optional | Default `pro`. |
 | `THESIS_SYNTHESIS_MODEL` | optional | Default `claude-opus-5-5`. |
 | `THESIS_SYNTHESIS_EFFORT` | optional | `low` / `medium` / `high`, default `medium`. |
@@ -103,7 +103,7 @@ Implemented against the official documentation read on 2026-11-05:
 
 The adapter sits behind the `ResearchProvider` interface, so another provider can be dropped in without touching the job layer or UI.
 
-Processors default to `base` for Quick (Parallel lists 15 s–3 min latency) and `pro` for Deep. The published list prices (docs.parallel.ai pricing page, read 2026-11-05) are shown in the report footer as a list price, clearly labelled as such, because the API does not return a metered charge.
+Processors default to `core` for Quick and `pro` for Deep. In testing on 2026-11-05 `core` runs took about 4 minutes, `pro` about 3.5, and `base` about 5.5, so the processor is not a reliable speed lever; research time is set by the provider. The published list prices (docs.parallel.ai pricing page, read 2026-11-05) are shown in the report footer as a list price, clearly labelled as such, because the API does not return a metered charge.
 
 ## Token-efficiency strategy
 

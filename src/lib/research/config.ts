@@ -23,7 +23,7 @@ export function getConfig() {
     parallel: {
       baseUrl: read("PARALLEL_BASE_URL") ?? PARALLEL_BASE_URL,
       apiKey: parallelKey,
-      processorQuick: read("THESIS_PARALLEL_PROCESSOR_QUICK") ?? "base",
+      processorQuick: read("THESIS_PARALLEL_PROCESSOR_QUICK") ?? "core",
       processorDeep: read("THESIS_PARALLEL_PROCESSOR_DEEP") ?? "pro",
     },
     synthesis: {
