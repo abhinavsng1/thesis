@@ -1,30 +1,27 @@
 # Agent transcripts
 
-This folder holds the exported conversation transcript of the Claude Code session that built Thesis.
+The Claude Code session that built Thesis, exported from the harness's own session store on 2026-11-05.
 
 ## Files
 
-- `session-10ced0b5-2026-11-05.jsonl` — verbatim export of the build session from Claude Code's session store (JSONL, one event per line: user messages, assistant messages, tool calls and tool results as recorded by the harness). The only edits are the redactions listed below. It is a snapshot copied near the end of the session, so the final few actions (this copy, the last commit) are not inside it.
+| File | What it is |
+| --- | --- |
+| `session-10ced0b5-2026-11-05.md` | The conversation rendered for reading: every user message, every assistant message, every tool call (name and arguments) and every tool result, in order, with IST timestamps. Long tool outputs are truncated in this rendering. Start here. |
+| `session-10ced0b5-2026-11-05.jsonl` | The same conversation as JSON Lines (one event per line, `{ts, role, content[]}`), with tool outputs in full. For anyone who wants to inspect or script over the record. |
+| `export.py` | The script that produced both files from `~/.claude/projects/<project>/<session-id>.jsonl`. Re-running it re-exports the current session. |
 
-## Provenance
+## How faithful is this?
 
-- Source: `~/.claude/projects/-Users-abhinavsingh/10ced0b5-8208-471c-804f-7869900f1dab.jsonl` on the build machine.
-- Export command (run from the project root):
+Lightly edited, not verbatim. These are the only changes:
 
-```bash
-SRC=~/.claude/projects/-Users-abhinavsingh/10ced0b5-8208-471c-804f-7869900f1dab.jsonl
-sed -E 's/sk-ant-[A-Za-z0-9_-]+/sk-ant-[REDACTED]/g; s/(PARALLEL_API_KEY|ANTHROPIC_API_KEY)=[^"\\ ]+/\1=[REDACTED]/g; s/<parallel key literal>/[PARALLEL_KEY_REDACTED]/g; s/[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}/[email redacted]/g' "$SRC" > build-transcripts/transcripts/session-10ced0b5-2026-11-05.jsonl
-```
+- **Redacted:** two provider API keys that were pasted into the chat (replaced with `[REDACTED]` placeholders), e-mail addresses, image bytes (`[image omitted]`), and a few expletives in the user's feedback (`[expletive]`).
+- **Removed:** the harness's internal API-request blobs (duplicates of the conversation sent to the model), bookkeeping events (mode changes, attachments), and empty reasoning placeholders. The harness does not persist hidden chain-of-thought, so none exists in the source file either.
+- **Not changed:** message order, wording, tool calls, tool results.
 
-- Redactions: API-key-shaped strings, `PARALLEL_API_KEY=` / `ANTHROPIC_API_KEY=` assignments, the two provider keys the user pasted into chat later in the session (replaced with `[REDACTED]` placeholders), and e-mail addresses. The user was advised to rotate both keys.
-- Hidden chain-of-thought is not part of the harness's session file and is therefore not in the export.
+The export covers the session from the first message (10:18 IST) to the moment of export. Later activity is summarised in `../session-log.md`.
 
-## Reading the file
+## Reading tips
 
-Each line is a JSON object. The `type` field distinguishes `user` and `assistant` events; tool calls appear as `tool_use` content blocks in assistant events and their results as `tool_result` blocks in the following user event. To list the assistant's visible messages:
-
-```bash
-jq -r 'select(.type=="assistant") | .message.content[]? | select(.type=="text") | .text' session-10ced0b5-2026-11-05.jsonl
-```
-
-If the file is missing or you need a fresh export, run the command above again on the build machine; `../session-log.md` is the accurate (non-verbatim) activity record either way.
+- The Markdown file is about 400 KB; a Markdown viewer with collapsible sections (VS Code, Obsidian, GitHub) makes the tool results fold away.
+- Each "Tool call" shows the exact command or file edit; the following "Tool result" shows what came back.
+- Decisions and their reasons are easier to find in `../decisions.md`; the transcript is the evidence behind them.
