@@ -8,7 +8,7 @@ Commands run, what they showed, and what is still open. All runs on 2026-11-05 u
 | --- | --- | --- |
 | Type check | `npx tsc --noEmit` (after `npx next typegen`) | Pass, no errors. |
 | Lint (incl. React compiler rules) | `npx eslint src` | Pass, 0 problems (after refactoring history into a `useSyncExternalStore` store and restructuring the polling hook). |
-| Unit tests | `npx vitest run` | 6 files, 30 tests, all pass. |
+| Unit tests | `npx vitest run` | 9 files, 38 tests, all pass (final count; grew from 30 as features were added). |
 | Production build | `npx next build` | Pass. `/` and `/research/[id]` are partially prerendered; API routes dynamic. |
 | Palette validation | dataviz `validate_palette.js "#0A7F92,#B08A4D,#B5473B" --mode light` | CVD separation PASS, normal-vision floor PASS, contrast PASS; chroma floor marginal (by design: muted comparison colour). Mitigated with legend + tooltips + direct series names. |
 
@@ -68,7 +68,7 @@ The user supplied provider keys after the initial handoff. Keys were placed in `
 - First synthesis attempt failed with HTTP 400 from Anthropic: "The compiled grammar is too large" (strict structured-output mode cannot compile the report schema, even with all length/pattern constraints removed). Fix: the model now returns a JSON object guided by the schema embedded in the cached system prompt; the server parses, Zod-validates, coerces into the strict schema, and retries once with the validation errors. Added `tests/synthesis.test.ts` (JSON extraction, coercion).
 - After the fix: `POST …/report` → 200 in 41 s. Report: 956 words, 7 sources (FY2026 10-K, SEC 8-K exhibits, IR releases, FY27 Q1 call page), 5 thesis points, 2 charts, 6 risks, 3 catalysts, limitations listing missing forecasts/valuation/capex guidance. Usage reported by the model: 4,402 input / 4,880 output tokens. A redundant "Answer:" prefix in the brief was stripped server-side.
 - Deployed site: `POST /api/research` returned "Research provider rejected the API key" (502) while the same code with the same key worked locally, so the value stored in Vercel is not the raw key. Vercel stores it as a hidden secret, so it cannot be inspected; the user was asked to re-add both values at the interactive `vercel env add` prompt and redeploy.
-- Full browser journey with real providers (Tesla question): see session log for the outcome.
+- Full browser journey with real providers (Tesla question): researching ~4 min → synthesizing → completed; 970 words, 6 primary sources, 2 charts; report persisted locally. After the user re-added the Vercel values, the deployed site also completed a real run end to end (962 words, 8 sources, 3 charts, synthesis 49 s).
 
 ## Live research activity feed (added at the user's request)
 
@@ -97,7 +97,6 @@ The user supplied provider keys after the initial handoff. Keys were placed in `
 
 ## Not verified / open
 
-- Behaviour against the real Parallel and Anthropic APIs (no credentials). The adapter follows the documentation read on 2026-11-05 and is unit-tested against documented shapes.
 - Real print-dialog pagination.
 - Rate limiting under genuine concurrent load (only the logic is unit-tested).
 - Cross-browser testing beyond Chrome.
