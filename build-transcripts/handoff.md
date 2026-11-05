@@ -71,6 +71,10 @@ While a run is in progress the workspace shows a phase rail (Plan → Search →
 - The sample reports were hand-compiled by the build agent from figures verified on 2026-11-05 against company filings and releases; they are not the output of a live research run and say so.
 - The disk on the build machine was nearly full during the session; this did not affect the delivered code but is noted in `validation.md`.
 
+## Demo video
+
+`~/Desktop/thesis-demo.mp4` (3 min 4 s, 1440×900, H.264, about 6 MB) shows a real run on the live site: home → example prompt → live research steps → streamed synthesis → the finished report (brief, full report, charts, citation drawer, sources, activity log). It was recorded with a separate headless Chrome against the production URL and is not stored in the repository.
+
 ## Transcripts
 
 See `transcripts/README.md`. The session transcript exported from Claude Code's session store is copied into `transcripts/` with API-key patterns and e-mail addresses redacted; the copy is a snapshot taken at the end of the build session and does not include any later activity.
