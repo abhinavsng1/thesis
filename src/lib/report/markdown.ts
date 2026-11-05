@@ -101,11 +101,11 @@ function sourceLine(s: Source): string {
   return `[${s.title}](${s.url})${meta ? ` — ${meta}` : ""}`;
 }
 
+/** Keeps the precision the source gave (up to 2 decimals) and adds thousands separators. */
 export function formatNumber(v: number): string {
   if (Number.isInteger(v)) return v.toLocaleString("en-US");
-  const abs = Math.abs(v);
-  const digits = abs >= 10 ? 1 : 2;
-  return v.toLocaleString("en-US", { maximumFractionDigits: digits, minimumFractionDigits: 0 });
+  const decimals = Math.min(2, (String(v).split(".")[1] ?? "").length);
+  return v.toLocaleString("en-US", { maximumFractionDigits: decimals, minimumFractionDigits: 0 });
 }
 
 function capitalize(s: string) {

@@ -59,3 +59,18 @@ describe("markdown export", () => {
     expect(computeStats(rest)).toEqual(stats);
   });
 });
+
+describe("chart helpers", () => {
+  it("niceScale produces rounded bounds and ticks", async () => {
+    const { niceScale } = await import("@/components/report/ChartFigure");
+    expect(niceScale([206, 145, 100])).toEqual({ domain: [0, 250], ticks: [0, 50, 100, 150, 200, 250] });
+    expect(niceScale([43, 33]).domain[1]).toBe(50);
+    expect(niceScale([-5, 10]).domain[0]).toBeLessThan(0);
+  });
+  it("chartRows aligns series by the union of periods", async () => {
+    const { chartRows } = await import("@/components/report/ChartFigure");
+    const rows = chartRows(SAMPLE_REPORTS[0].charts[3]);
+    expect(rows.map((r) => r.period)).toContain("Q2 FY27");
+    expect(rows.find((r) => r.period === "Q2 FY27")?.s1).toBe(50);
+  });
+});
