@@ -1,0 +1,3 @@
+build-transcripts
+tests
+.env*.local
