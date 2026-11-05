@@ -21,10 +21,11 @@ KEY_PATTERNS = [
 LITERALS = [l for l in (pathlib.Path(__file__).with_name("redact.local").read_text().split() if pathlib.Path(__file__).with_name("redact.local").exists() else [])]
 
 def redact(s: str) -> str:
-    for lit in LITERALS:
-        s = s.replace(lit, "[REDACTED]")
+    # Patterns first (they match whole keys); literals last (fragments, prefixes, words).
     for pat, rep in KEY_PATTERNS:
         s = pat.sub(rep, s)
+    for lit in LITERALS:
+        s = s.replace(lit, "[REDACTED]")
     return s
 
 def clean_block(b):
